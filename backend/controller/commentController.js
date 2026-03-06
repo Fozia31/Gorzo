@@ -1,87 +1,73 @@
 const Comment = require("../models/comment");
-const Post = require("../models/post");
+const asyncHandler = require("../utiles/asyncHandler");
+const ApiError = require("../utiles/apiError");
+const { ensureRequiredFields, ensureValidObjectId } = require("../utiles/validation");
 
-const createComment = async (req, res) => {
-	try {
-		const { post_id, display_name, content, is_anonymous, user_id } = req.body;
+const createComment = asyncHandler(async (req, res) => {
+	ensureRequiredFields(req.body, ["postId", "userId", "displayName", "content"]);
+	ensureValidObjectId(req.body.postId, "postId");
+	ensureValidObjectId(req.body.userId, "userId");
 
-		if (!post_id || !content) {
-			return res.status(400).json({
-				success: false,
-				message: "post_id and content are required",
-			});
-		}
+	const comment = await Comment.create({
+		postId: req.body.postId,
+		userId: req.body.userId,
+		displayName: req.body.displayName,
+		content: req.body.content,
+		isReported: Boolean(req.body.isReported),
+	});
 
-		const post = await Post.findOne({ post_id, status: "active" });
-		if (!post) {
-			return res.status(404).json({
-				success: false,
-				message: "Post not found",
-			});
-		}
+	return res.status(201).json({ success: true, message: "Comment created", data: comment });
+});
 
-		const comment = await Comment.create({
-			post_id,
-			display_name,
-			content,
-			is_anonymous,
-			user_id,
-		});
-
-		await Post.updateOne({ post_id }, { $inc: { comments_count: 1 } });
-
-		return res.status(201).json({
-			success: true,
-			message: "Comment added successfully",
-			data: comment,
-		});
-	} catch (error) {
-		return res.status(500).json({
-			success: false,
-			message: error.message || "Failed to add comment",
-		});
+const getComments = asyncHandler(async (req, res) => {
+	const filter = {};
+	if (req.query.postId) {
+		ensureValidObjectId(req.query.postId, "postId");
+		filter.postId = req.query.postId;
 	}
-};
-
-const getCommentsByPost = async (req, res) => {
-	try {
-		const { post_id } = req.params;
-		const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-		const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
-		const skip = (page - 1) * limit;
-
-		if (!post_id) {
-			return res.status(400).json({
-				success: false,
-				message: "post_id is required",
-			});
-		}
-
-		const filter = { post_id, status: "active" };
-		const [comments, total] = await Promise.all([
-			Comment.find(filter).sort({ created_at: 1 }).skip(skip).limit(limit),
-			Comment.countDocuments(filter),
-		]);
-
-		return res.status(200).json({
-			success: true,
-			data: comments,
-			pagination: {
-				page,
-				limit,
-				total,
-				total_pages: Math.ceil(total / limit),
-			},
-		});
-	} catch (error) {
-		return res.status(500).json({
-			success: false,
-			message: error.message || "Failed to fetch comments",
-		});
+	if (req.query.userId) {
+		ensureValidObjectId(req.query.userId, "userId");
+		filter.userId = req.query.userId;
 	}
-};
+	if (typeof req.query.isReported === "string") filter.isReported = req.query.isReported === "true";
+
+	const items = await Comment.find(filter).sort({ createdAt: -1 });
+	return res.status(200).json({ success: true, data: items });
+});
+
+const getCommentById = asyncHandler(async (req, res) => {
+	const commentId = req.params.commentId || req.params.id;
+	ensureValidObjectId(commentId, "comment id");
+	const comment = await Comment.findById(commentId);
+	if (!comment) throw new ApiError(404, "Comment not found");
+	return res.status(200).json({ success: true, data: comment });
+});
+
+const updateComment = asyncHandler(async (req, res) => {
+	const commentId = req.params.commentId || req.params.id;
+	ensureValidObjectId(commentId, "comment id");
+	const payload = {};
+	if (req.body.content !== undefined) payload.content = req.body.content;
+	if (req.body.isReported !== undefined) payload.isReported = req.body.isReported;
+	if (Object.keys(payload).length === 0) throw new ApiError(400, "No valid fields to update");
+
+	const updated = await Comment.findByIdAndUpdate(commentId, payload, { new: true, runValidators: true });
+	if (!updated) throw new ApiError(404, "Comment not found");
+	return res.status(200).json({ success: true, message: "Comment updated", data: updated });
+});
+
+const deleteComment = asyncHandler(async (req, res) => {
+	const commentId = req.params.commentId || req.params.id;
+	ensureValidObjectId(commentId, "comment id");
+	const deleted = await Comment.findByIdAndDelete(commentId);
+	if (!deleted) throw new ApiError(404, "Comment not found");
+	return res.status(200).json({ success: true, message: "Comment deleted" });
+});
 
 module.exports = {
 	createComment,
-	getCommentsByPost,
+	getComments,
+	getCommentById,
+	updateComment,
+	deleteComment,
 };

@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const commentSchema = new mongoose.Schema(
+const postEngagementSchema = new mongoose.Schema(
 	{
 		postId: {
 			type: mongoose.Schema.Types.ObjectId,
@@ -14,22 +14,15 @@ const commentSchema = new mongoose.Schema(
 			required: true,
 			index: true,
 		},
-		displayName: {
+		type: {
 			type: String,
 			required: true,
-			trim: true,
-			maxlength: 60,
+			enum: ["Like", "Report"],
 		},
-		content: {
+		reportReason: {
 			type: String,
-			required: true,
 			trim: true,
-			minlength: 1,
-			maxlength: 1000,
-		},
-		isReported: {
-			type: Boolean,
-			default: false,
+			default: "",
 		},
 	},
 	{
@@ -37,6 +30,7 @@ const commentSchema = new mongoose.Schema(
 	}
 );
 
-commentSchema.index({ postId: 1, createdAt: 1 });
+postEngagementSchema.index({ postId: 1, type: 1, createdAt: -1 });
+postEngagementSchema.index({ postId: 1, userId: 1, type: 1 }, { unique: true });
 
-module.exports = mongoose.model("Comment", commentSchema);
+module.exports = mongoose.model("PostEngagement", postEngagementSchema);

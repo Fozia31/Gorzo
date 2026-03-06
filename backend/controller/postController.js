@@ -1,72 +1,86 @@
 const Post = require("../models/post");
+const asyncHandler = require("../utiles/asyncHandler");
+const ApiError = require("../utiles/apiError");
+const { ensureRequiredFields, ensureValidObjectId } = require("../utiles/validation");
 
-const createPost = async (req, res) => {
-  try {
-    const { display_name, content, category, is_anonymous, user_id } = req.body;
+const createPost = asyncHandler(async (req, res) => {
+	ensureRequiredFields(req.body, ["userId", "title", "content", "category"]);
+	ensureValidObjectId(req.body.userId, "userId");
 
-    if (!content || !category) {
-      return res.status(400).json({
-        success: false,
-        message: "content and category are required",
-      });
-    }
+	const post = await Post.create({
+		userId: req.body.userId,
+		title: req.body.title,
+		content: req.body.content,
+		category: req.body.category,
+		isAnonymous: req.body.isAnonymous !== undefined ? req.body.isAnonymous : true,
+		tags: Array.isArray(req.body.tags) ? req.body.tags : [],
+	});
 
-    const post = await Post.create({
-      display_name,
-      content,
-      category,
-      is_anonymous,
-      user_id,
-    });
+	return res.status(201).json({ success: true, message: "Post created", data: post });
+});
 
-    return res.status(201).json({
-      success: true,
-      message: "Post created successfully",
-      data: post,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message || "Failed to create post",
-    });
-  }
-};
+const getPosts = asyncHandler(async (req, res) => {
+	const page = Math.max(Number(req.query.page) || 1, 1);
+	const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
+	const skip = (page - 1) * limit;
+	const filter = {};
 
-const getPosts = async (req, res) => {
-  try {
-    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 50);
-    const skip = (page - 1) * limit;
+	if (req.query.category) filter.category = req.query.category;
+	if (typeof req.query.isAnonymous === "string") filter.isAnonymous = req.query.isAnonymous === "true";
+	if (req.query.userId) {
+		ensureValidObjectId(req.query.userId, "userId");
+		filter.userId = req.query.userId;
+	}
+	if (req.query.tag) filter.tags = req.query.tag.toLowerCase().trim();
 
-    const filter = { status: "active" };
-    if (req.query.category) {
-      filter.category = req.query.category;
-    }
+	const [items, total] = await Promise.all([
+		Post.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+		Post.countDocuments(filter),
+	]);
 
-    const [posts, total] = await Promise.all([
-      Post.find(filter).sort({ created_at: -1 }).skip(skip).limit(limit),
-      Post.countDocuments(filter),
-    ]);
+	return res.status(200).json({
+		success: true,
+		data: items,
+		pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+	});
+});
 
-    return res.status(200).json({
-      success: true,
-      data: posts,
-      pagination: {
-        page,
-        limit,
-        total,
-        total_pages: Math.ceil(total / limit),
-      },
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message || "Failed to fetch posts",
-    });
-  }
-};
+const getPostById = asyncHandler(async (req, res) => {
+	const postId = req.params.postId || req.params.id;
+	ensureValidObjectId(postId, "post id");
+	const post = await Post.findById(postId);
+	if (!post) throw new ApiError(404, "Post not found");
+	return res.status(200).json({ success: true, data: post });
+});
+
+const updatePost = asyncHandler(async (req, res) => {
+	const postId = req.params.postId || req.params.id;
+	ensureValidObjectId(postId, "post id");
+	const allowedFields = ["title", "content", "category", "isAnonymous", "tags"];
+	const payload = {};
+	for (const field of allowedFields) if (req.body[field] !== undefined) payload[field] = req.body[field];
+	if (Object.keys(payload).length === 0) throw new ApiError(400, "No valid fields to update");
+
+	const updated = await Post.findByIdAndUpdate(postId, payload, {
+		new: true,
+		runValidators: true,
+	});
+	if (!updated) throw new ApiError(404, "Post not found");
+	return res.status(200).json({ success: true, message: "Post updated", data: updated });
+});
+
+const deletePost = asyncHandler(async (req, res) => {
+	const postId = req.params.postId || req.params.id;
+	ensureValidObjectId(postId, "post id");
+	const deleted = await Post.findByIdAndDelete(postId);
+	if (!deleted) throw new ApiError(404, "Post not found");
+	return res.status(200).json({ success: true, message: "Post deleted" });
+});
 
 module.exports = {
-  createPost,
-  getPosts,
+	createPost,
+	getPosts,
+	getPostById,
+	updatePost,
+	deletePost,
 };
