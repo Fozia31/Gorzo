@@ -1,0 +1,332 @@
+"use client"
+
+import { useState } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { 
+  MessageCircle,
+  Send,
+  Clock,
+  Crown,
+  Search,
+  ArrowLeft,
+  Shield
+} from "lucide-react"
+import { cn } from "@/lib/utils"
+
+// Sample chat queue
+const chatQueue = [
+  {
+    id: 1,
+    username: "WellnessSeeker",
+    avatar: "WS",
+    lastMessage: "Hello Dr. Amara, I've been experiencing irregular cycles for the past 3 months.",
+    lastMessageTime: "2h ago",
+    unread: 2,
+    priority: "high",
+  },
+  {
+    id: 2,
+    username: "BloomingFlower",
+    avatar: "BF",
+    lastMessage: "Thank you for your response. I have another question about...",
+    lastMessageTime: "5h ago",
+    unread: 1,
+    priority: "normal",
+  },
+  {
+    id: 3,
+    username: "HopefulMama",
+    avatar: "HM",
+    lastMessage: "The supplements you recommended are working great!",
+    lastMessageTime: "1d ago",
+    unread: 0,
+    priority: "normal",
+  },
+  {
+    id: 4,
+    username: "StrongSister",
+    avatar: "SS",
+    lastMessage: "I'm feeling much better after following your advice.",
+    lastMessageTime: "2d ago",
+    unread: 0,
+    priority: "normal",
+  },
+]
+
+function ChatView({ chat, onBack }: { chat: typeof chatQueue[0], onBack: () => void }) {
+  const [message, setMessage] = useState("")
+  
+  // Sample messages
+  const messages = [
+    {
+      id: 1,
+      sender: "user",
+      content: "Hello Dr. Amara, I've been experiencing irregular cycles for the past 3 months.",
+      time: "Yesterday, 10:30 AM"
+    },
+    {
+      id: 2,
+      sender: "doctor",
+      content: "Hello! Thank you for reaching out. Irregular cycles can have various causes. Can you tell me more about your symptoms? Are you experiencing any pain, unusual discharge, or other changes?",
+      time: "Yesterday, 11:45 AM"
+    },
+    {
+      id: 3,
+      sender: "user",
+      content: "No pain, but I've noticed some weight changes and mood swings.",
+      time: "Yesterday, 2:00 PM"
+    },
+  ]
+
+  const handleSend = () => {
+    if (message.trim()) {
+      // In real app, this would send the message
+      setMessage("")
+    }
+  }
+
+  return (
+    <div className="flex h-[calc(100vh-8rem)] flex-col">
+      {/* Chat Header */}
+      <div className="flex items-center gap-3 border-b border-border p-4">
+        <Button variant="ghost" size="icon" onClick={onBack}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <Avatar className="h-10 w-10">
+          <AvatarFallback className="bg-primary/10 text-primary">
+            {chat.avatar}
+          </AvatarFallback>
+        </Avatar>
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <h3 className="font-medium">{chat.username}</h3>
+            <Crown className="h-3 w-3 text-secondary-foreground" />
+          </div>
+          <p className="text-xs text-muted-foreground">Premium Member</p>
+        </div>
+        <Badge variant={chat.priority === "high" ? "default" : "secondary"}>
+          {chat.priority === "high" ? "Priority" : "Normal"}
+        </Badge>
+      </div>
+
+      {/* Privacy Notice */}
+      <div className="border-b border-border px-4 py-2 bg-muted/30">
+        <p className="text-xs text-muted-foreground flex items-center gap-1">
+          <Shield className="h-3 w-3" />
+          Chat history is managed by the patient for their privacy
+        </p>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map((msg) => (
+          <div key={msg.id} className={cn("flex", msg.sender === "doctor" ? "justify-end" : "justify-start")}>
+            <div className={cn(
+              "max-w-[80%] rounded-2xl px-4 py-2",
+              msg.sender === "doctor" 
+                ? "bg-primary text-primary-foreground rounded-br-sm" 
+                : "bg-muted rounded-bl-sm"
+            )}>
+              <p className="text-sm">{msg.content}</p>
+              <p className={cn(
+                "mt-1 text-[10px]",
+                msg.sender === "doctor" ? "text-primary-foreground/70" : "text-muted-foreground"
+              )}>
+                {msg.time}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Input */}
+      <div className="border-t border-border p-4">
+        <div className="flex gap-2">
+          <Input
+            placeholder="Type your response..."
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            className="flex-1"
+          />
+          <Button onClick={handleSend} disabled={!message.trim()}>
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function DoctorChatsPage() {
+  const [selectedChat, setSelectedChat] = useState<typeof chatQueue[0] | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+
+  const filteredChats = chatQueue.filter(chat => 
+    chat.username.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  const pendingChats = filteredChats.filter(c => c.unread > 0)
+  const resolvedChats = filteredChats.filter(c => c.unread === 0)
+
+  if (selectedChat) {
+    return <ChatView chat={selectedChat} onBack={() => setSelectedChat(null)} />
+  }
+
+  return (
+    <div className="space-y-6 p-4 md:p-6">
+      {/* Header */}
+      <div>
+        <h1 className="font-serif text-2xl font-semibold text-foreground md:text-3xl">
+          Premium Chat Queue
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Private consultations with premium members
+        </p>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3">
+        <Card className="border-border/50">
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="rounded-full bg-primary/10 p-2">
+              <MessageCircle className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-xl font-semibold">{pendingChats.length}</p>
+              <p className="text-xs text-muted-foreground">Pending</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-border/50">
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="rounded-full bg-secondary/30 p-2">
+              <Clock className="h-4 w-4 text-secondary-foreground" />
+            </div>
+            <div>
+              <p className="text-xl font-semibold">2.5h</p>
+              <p className="text-xs text-muted-foreground">Avg Response</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-border/50">
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="rounded-full bg-muted p-2">
+              <Crown className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-xl font-semibold">{chatQueue.length}</p>
+              <p className="text-xs text-muted-foreground">Total Chats</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Search conversations..."
+          className="pl-10"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
+
+      {/* Pending Messages */}
+      {pendingChats.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="flex items-center gap-2 text-lg font-semibold">
+            <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+            Needs Response ({pendingChats.length})
+          </h2>
+          {pendingChats.map((chat) => (
+            <Card 
+              key={chat.id} 
+              className={cn(
+                "cursor-pointer transition-all hover:shadow-md",
+                chat.priority === "high" && "border-primary/30"
+              )}
+              onClick={() => setSelectedChat(chat)}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-12 w-12">
+                    <AvatarFallback className="bg-primary/10 text-primary">
+                      {chat.avatar}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium">{chat.username}</h3>
+                        <Crown className="h-3 w-3 text-secondary-foreground" />
+                      </div>
+                      <span className="text-xs text-muted-foreground shrink-0">{chat.lastMessageTime}</span>
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground truncate">{chat.lastMessage}</p>
+                  </div>
+                  {chat.unread > 0 && (
+                    <Badge className="shrink-0">{chat.unread}</Badge>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Resolved Chats */}
+      {resolvedChats.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold text-muted-foreground">
+            Recent Conversations
+          </h2>
+          {resolvedChats.map((chat) => (
+            <Card 
+              key={chat.id} 
+              className="cursor-pointer transition-all hover:shadow-md"
+              onClick={() => setSelectedChat(chat)}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-12 w-12">
+                    <AvatarFallback className="bg-muted text-muted-foreground">
+                      {chat.avatar}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium">{chat.username}</h3>
+                        <Crown className="h-3 w-3 text-secondary-foreground" />
+                      </div>
+                      <span className="text-xs text-muted-foreground shrink-0">{chat.lastMessageTime}</span>
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground truncate">{chat.lastMessage}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {filteredChats.length === 0 && (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <MessageCircle className="mb-4 h-12 w-12 text-muted-foreground/50" />
+            <h3 className="text-lg font-medium">No conversations found</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {searchQuery ? "Try a different search term" : "You're all caught up!"}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
