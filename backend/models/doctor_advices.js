@@ -2,73 +2,65 @@ const mongoose = require("mongoose");
 
 const doctorAdviceSchema = new mongoose.Schema(
 	{
-		advice_id: {
-			type: String,
-			unique: true,
+		doctorId: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: "Doctor",
+			required: true,
 			index: true,
-			default: () => new mongoose.Types.ObjectId().toString(),
 		},
-		doctor_name: {
+		title: {
 			type: String,
 			required: true,
 			trim: true,
-			maxlength: 80,
+			maxlength: 180,
 		},
-		specialization: {
+		category: {
 			type: String,
 			required: true,
 			trim: true,
-			enum: [
-				"gynecologist",
-				"reproductive health",
-				"mental health",
-				"sexual health educator",
-				"general",
-			],
 		},
-		topic: {
+		contentType: {
 			type: String,
 			required: true,
-			trim: true,
-			enum: [
-				"contraception",
-				"menstrual health",
-				"stis",
-				"pregnancy",
-				"fertility",
-				"mental health",
-				"general",
-			],
+			enum: ["Text", "VoiceURL"],
 		},
-		audio_url: {
+		textContent: {
 			type: String,
-			required: true,
 			trim: true,
-			validate: {
-				validator: (value) => /^(https?:\/\/|gs:\/\/).+/.test(value),
-				message: "audio_url must be a valid http(s) or gs:// URL",
-			},
+			default: "",
 		},
-		description: {
+		voiceUrl: {
+			type: String,
+			trim: true,
+			default: "",
+		},
+		audioDuration: {
+			type: Number,
+			min: 0,
+			default: 0,
+		},
+		transcript: {
+			type: String,
+			trim: true,
+			default: "",
+		},
+		isPublished: {
+			type: Boolean,
+			default: true,
+		},
+		summary: {
 			type: String,
 			trim: true,
 			maxlength: 500,
-			default: null,
-		},
-		status: {
-			type: String,
-			enum: ["active", "archived"],
-			default: "active",
+			default: "",
 		},
 	},
 	{
-		timestamps: {
-			createdAt: "created_at",
-			updatedAt: "updated_at",
-		},
+		timestamps: true,
 	}
 );
 
-doctorAdviceSchema.index({ topic: 1, specialization: 1, created_at: -1 });
+doctorAdviceSchema.index({ doctorId: 1, createdAt: -1 });
+doctorAdviceSchema.index({ category: 1, contentType: 1 });
 
 module.exports = mongoose.model("DoctorAdvice", doctorAdviceSchema);

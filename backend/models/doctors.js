@@ -2,62 +2,40 @@ const mongoose = require("mongoose");
 
 const doctorSchema = new mongoose.Schema(
 	{
-		doctor_id: {
-			type: String,
+		userId: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: "User",
+			required: true,
 			unique: true,
 			index: true,
-			default: () => new mongoose.Types.ObjectId().toString(),
-		},
-		full_name: {
-			type: String,
-			required: true,
-			trim: true,
-			maxlength: 80,
-		},
-		email: {
-			type: String,
-			required: true,
-			unique: true,
-			trim: true,
-			lowercase: true,
-		},
-		password_hash: {
-			type: String,
-			required: true,
-			minlength: 8,
 		},
 		specialization: {
 			type: String,
 			required: true,
 			trim: true,
-			enum: [
-				"gynecologist",
-				"reproductive health",
-				"mental health",
-				"general",
-			],
-			default: "general",
 		},
-		created_by_admin_id: {
+		verificationStatus: {
+			type: String,
+			enum: ["Pending", "Verified", "Rejected"],
+			default: "Pending",
+		},
+		createdByAdminId: {
 			type: mongoose.Schema.Types.ObjectId,
 			ref: "Admin",
 			required: true,
 		},
-		role: {
+		bio: {
 			type: String,
-			enum: ["doctor"],
-			default: "doctor",
+			trim: true,
+			default: "",
 		},
 	},
 	{
-		timestamps: {
-			createdAt: "created_at",
-			updatedAt: "updated_at",
-		},
+		timestamps: true,
 	}
 );
 
-doctorSchema.index({ email: 1 });
 doctorSchema.index({ specialization: 1 });
+doctorSchema.index({ verificationStatus: 1 });
 
 module.exports = mongoose.model("Doctor", doctorSchema);

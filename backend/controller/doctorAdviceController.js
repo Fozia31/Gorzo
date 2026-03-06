@@ -1,76 +1,96 @@
 const DoctorAdvice = require("../models/doctor_advices");
+const asyncHandler = require("../utiles/asyncHandler");
+const ApiError = require("../utiles/apiError");
+const { ensureRequiredFields, ensureValidObjectId } = require("../utiles/validation");
 
-const createDoctorAdvice = async (req, res) => {
-	try {
-		const { doctor_name, specialization, topic, audio_url, description } = req.body;
+const createDoctorAdvice = asyncHandler(async (req, res) => {
+	ensureRequiredFields(req.body, ["doctorId", "title", "category", "contentType"]);
+	ensureValidObjectId(req.body.doctorId, "doctorId");
 
-		if (!doctor_name || !specialization || !topic || !audio_url) {
-			return res.status(400).json({
-				success: false,
-				message:
-					"doctor_name, specialization, topic and audio_url are required",
-			});
-		}
+	const payload = {
+		doctorId: req.body.doctorId,
+		title: req.body.title,
+		category: req.body.category,
+		contentType: req.body.contentType,
+		textContent: req.body.textContent || "",
+		voiceUrl: req.body.voiceUrl || "",
+		audioDuration: req.body.audioDuration || 0,
+		transcript: req.body.transcript || "",
+		summary: req.body.summary || "",
+		isPublished: req.body.isPublished !== undefined ? req.body.isPublished : true,
+	};
 
-		const advice = await DoctorAdvice.create({
-			doctor_name,
-			specialization,
-			topic,
-			audio_url,
-			description,
-		});
-
-		return res.status(201).json({
-			success: true,
-			message: "Doctor advice created successfully",
-			data: advice,
-		});
-	} catch (error) {
-		return res.status(500).json({
-			success: false,
-			message: error.message || "Failed to create doctor advice",
-		});
+	if (payload.contentType === "Text" && !payload.textContent) {
+		throw new ApiError(400, "textContent is required for Text contentType");
 	}
-};
-
-const getDoctorAdvice = async (req, res) => {
-	try {
-		const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-		const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 50);
-		const skip = (page - 1) * limit;
-
-		const filter = { status: "active" };
-		if (req.query.specialization) {
-			filter.specialization = req.query.specialization;
-		}
-		if (req.query.topic) {
-			filter.topic = req.query.topic;
-		}
-
-		const [items, total] = await Promise.all([
-			DoctorAdvice.find(filter).sort({ created_at: -1 }).skip(skip).limit(limit),
-			DoctorAdvice.countDocuments(filter),
-		]);
-
-		return res.status(200).json({
-			success: true,
-			data: items,
-			pagination: {
-				page,
-				limit,
-				total,
-				total_pages: Math.ceil(total / limit),
-			},
-		});
-	} catch (error) {
-		return res.status(500).json({
-			success: false,
-			message: error.message || "Failed to fetch doctor advice",
-		});
+	if (payload.contentType === "VoiceURL" && !payload.voiceUrl) {
+		throw new ApiError(400, "voiceUrl is required for VoiceURL contentType");
 	}
-};
+
+	const item = await DoctorAdvice.create(payload);
+	return res.status(201).json({ success: true, message: "Article/Lesson created", data: item });
+});
+
+const getDoctorAdvice = asyncHandler(async (req, res) => {
+	const filter = {};
+	if (req.query.doctorId) {
+		ensureValidObjectId(req.query.doctorId, "doctorId");
+		filter.doctorId = req.query.doctorId;
+	}
+	if (req.query.category) filter.category = req.query.category;
+	if (req.query.contentType) filter.contentType = req.query.contentType;
+	if (typeof req.query.isPublished === "string") filter.isPublished = req.query.isPublished === "true";
+
+	const items = await DoctorAdvice.find(filter).sort({ createdAt: -1 });
+	return res.status(200).json({ success: true, data: items });
+});
+
+const getDoctorAdviceById = asyncHandler(async (req, res) => {
+	const adviceId = req.params.adviceId || req.params.id;
+	ensureValidObjectId(adviceId, "article id");
+	const item = await DoctorAdvice.findById(adviceId);
+	if (!item) throw new ApiError(404, "Article/Lesson not found");
+	return res.status(200).json({ success: true, data: item });
+});
+
+const updateDoctorAdvice = asyncHandler(async (req, res) => {
+	const adviceId = req.params.adviceId || req.params.id;
+	ensureValidObjectId(adviceId, "article id");
+	const allowed = [
+		"title",
+		"category",
+		"contentType",
+		"textContent",
+		"voiceUrl",
+		"audioDuration",
+		"transcript",
+		"summary",
+		"isPublished",
+	];
+	const payload = {};
+	for (const field of allowed) if (req.body[field] !== undefined) payload[field] = req.body[field];
+	if (Object.keys(payload).length === 0) throw new ApiError(400, "No valid fields to update");
+
+	const updated = await DoctorAdvice.findByIdAndUpdate(adviceId, payload, {
+		new: true,
+		runValidators: true,
+	});
+	if (!updated) throw new ApiError(404, "Article/Lesson not found");
+	return res.status(200).json({ success: true, message: "Article/Lesson updated", data: updated });
+});
+
+const deleteDoctorAdvice = asyncHandler(async (req, res) => {
+	const adviceId = req.params.adviceId || req.params.id;
+	ensureValidObjectId(adviceId, "article id");
+	const deleted = await DoctorAdvice.findByIdAndDelete(adviceId);
+	if (!deleted) throw new ApiError(404, "Article/Lesson not found");
+	return res.status(200).json({ success: true, message: "Article/Lesson deleted" });
+});
 
 module.exports = {
 	createDoctorAdvice,
 	getDoctorAdvice,
+	getDoctorAdviceById,
+	updateDoctorAdvice,
+	deleteDoctorAdvice,
 };

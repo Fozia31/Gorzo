@@ -4,73 +4,59 @@ const postSchema = new mongoose.Schema(
 	{
 		post_id: {
 			type: String,
-			unique: true,
-			index: true,
 			default: () => new mongoose.Types.ObjectId().toString(),
+			index: true,
 		},
-		user_id: {
+		userId: {
 			type: mongoose.Schema.Types.ObjectId,
 			ref: "User",
-			default: null,
+			required: true,
+			index: true,
 		},
-		display_name: {
+		title: {
 			type: String,
+			required: true,
 			trim: true,
-			maxlength: 60,
-			default: null,
+			maxlength: 180,
 		},
 		content: {
 			type: String,
 			required: true,
 			trim: true,
 			minlength: 5,
-			maxlength: 2000,
+			maxlength: 5000,
 		},
 		category: {
 			type: String,
 			required: true,
 			trim: true,
-			enum: [
-				"menstrual health",
-				"contraception",
-				"pregnancy",
-				"mental health",
-				"sexual wellness",
-				"fertility",
-				"pcos",
-				"sti/std",
-				"general",
-			],
-			default: "general",
+		},
+		isAnonymous: {
+			type: Boolean,
+			default: true,
 		},
 		likes: {
 			type: Number,
 			min: 0,
 			default: 0,
 		},
-		comments_count: {
+		reports: {
 			type: Number,
 			min: 0,
 			default: 0,
 		},
-		is_anonymous: {
-			type: Boolean,
-			default: true,
-		},
-		status: {
-			type: String,
-			enum: ["active", "hidden", "deleted"],
-			default: "active",
+		tags: {
+			type: [String],
+			default: [],
+			set: (values) => values.map((value) => value.trim().toLowerCase()),
 		},
 	},
 	{
-		timestamps: {
-			createdAt: "created_at",
-			updatedAt: "updated_at",
-		},
+		timestamps: true,
 	}
 );
 
-postSchema.index({ category: 1, created_at: -1 });
+postSchema.index({ category: 1, createdAt: -1 });
+postSchema.index({ tags: 1 });
 
 module.exports = mongoose.model("Post", postSchema);

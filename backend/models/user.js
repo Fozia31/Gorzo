@@ -2,13 +2,7 @@ const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema(
 	{
-		user_id: {
-			type: String,
-			unique: true,
-			index: true,
-			default: () => new mongoose.Types.ObjectId().toString(),
-		},
-		display_name: {
+		displayName: {
 			type: String,
 			required: true,
 			trim: true,
@@ -21,30 +15,24 @@ const userSchema = new mongoose.Schema(
 			trim: true,
 			lowercase: true,
 		},
-		password_hash: {
+		password: {
 			type: String,
 			required: true,
 			minlength: 8,
 		},
 		role: {
 			type: String,
-			enum: ["user"],
-			default: "user",
+			enum: ["Admin", "Doctor", "User"],
+			default: "User",
 		},
-		registered_by: {
-			type: String,
-			enum: ["self"],
-			default: "self",
+		isPremium: {
+			type: Boolean,
+			default: false,
 		},
 	},
 	{
-		timestamps: {
-			createdAt: "created_at",
-			updatedAt: "updated_at",
-		},
+		timestamps: true,
 	}
 );
-
-userSchema.index({ email: 1 });
 
 module.exports = mongoose.model("User", userSchema);
