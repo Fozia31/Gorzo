@@ -6,10 +6,14 @@ const ApiError = require("../utiles/apiError");
 const { ensureRequiredFields, ensureValidObjectId } = require("../utiles/validation");
 
 const createDoctor = asyncHandler(async (req, res) => {
-	ensureRequiredFields(req.body, ["adminId", "displayName", "email", "password", "specialization"]);
-	ensureValidObjectId(req.body.adminId, "adminId");
+	const adminId = req.params.adminId || req.body.adminId;
+	if (!adminId) {
+		throw new ApiError(400, "adminId is required in route params");
+	}
+	ensureValidObjectId(adminId, "adminId");
+	ensureRequiredFields(req.body, ["displayName", "email", "password", "specialization"]);
 
-	const admin = await Admin.findById(req.body.adminId);
+	const admin = await Admin.findById(adminId);
 	if (!admin) throw new ApiError(404, "Admin not found. Only admins can create doctors");
 
 	const existingUser = await User.findOne({ email: req.body.email.toLowerCase().trim() });

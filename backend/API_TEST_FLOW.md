@@ -97,11 +97,10 @@ Save:
 ## 3) Admin Onboards Doctor (important rule)
 
 ### Create Doctor (Admin-controlled)
-- POST `/api/doctors`
+- POST `/api/doctors/admin/ADMIN_ID`
 
 ```json
 {
-  "adminId": "ADMIN_ID",
   "displayName": "Dr. Sara",
   "email": "dr.sara@herhealth.com",
   "password": "DoctorPass123",

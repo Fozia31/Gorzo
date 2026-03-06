@@ -9,7 +9,8 @@ const {
 
 const router = express.Router();
 
-router.post("/", createDoctor);
+router.post("/admin/:adminId", createDoctor);
+router.post("/:adminId", createDoctor);
 router.get("/", getDoctors);
 router.get("/:doctorId", getDoctorById);
 router.put("/:doctorId", updateDoctor);
