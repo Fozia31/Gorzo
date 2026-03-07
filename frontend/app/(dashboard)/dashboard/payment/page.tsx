@@ -62,6 +62,11 @@ const doctors = [
 function PaymentPageContent() {
   const searchParams = useSearchParams()
   const doctorId = searchParams.get("doctor")
+  const doctorRecordId = searchParams.get("doctorRecordId")
+  const doctorNameParam = searchParams.get("doctorName")
+  const specialtyParam = searchParams.get("specialty")
+  const ratingParam = searchParams.get("rating")
+  const avatarParam = searchParams.get("avatar")
   const amountParam = searchParams.get("amount")
   const { updateTier } = useAuth()
   
@@ -69,8 +74,23 @@ function PaymentPageContent() {
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("idle")
   const [transactionId, setTransactionId] = useState("")
 
-  // Find the doctor
-  const doctor = doctorId ? doctors.find(d => d.id === parseInt(doctorId)) : null
+  const parsedDoctorId = doctorId ? Number(doctorId) : Number.NaN
+  const doctorFromList = Number.isFinite(parsedDoctorId)
+    ? doctors.find((d) => d.id === parsedDoctorId)
+    : undefined
+
+  const doctor = doctorFromList || (doctorNameParam
+    ? {
+        id: Number.isFinite(parsedDoctorId) ? parsedDoctorId : 0,
+        doctorRecordId: doctorRecordId || "",
+        name: decodeURIComponent(doctorNameParam),
+        specialty: decodeURIComponent(specialtyParam || "General Practitioner"),
+        avatar: decodeURIComponent(avatarParam || "/logo.jpg"),
+        rating: Number(ratingParam || 0),
+        consultationFee: amountParam ? parseInt(amountParam) : 299,
+      }
+    : null)
+
   const amount = amountParam ? parseInt(amountParam) : doctor?.consultationFee || 299
 
   const formatPhoneNumber = (value: string) => {
@@ -180,7 +200,10 @@ function PaymentPageContent() {
             </div>
 
             <div className="flex w-full flex-col gap-2">
-              <Link href={`/dashboard/consulting?payment=success&doctor=${doctorId}`} className="w-full">
+              <Link
+                href={`/dashboard/consulting?payment=success&doctor=${encodeURIComponent(String(doctorId || doctor.id))}${doctorRecordId ? `&doctorRecordId=${encodeURIComponent(doctorRecordId)}` : ""}`}
+                className="w-full"
+              >
                 <Button className="w-full gap-2">
                   <MessageCircle className="h-4 w-4" />
                   Start Chatting with {doctor.name.split(' ')[0]}
@@ -259,10 +282,10 @@ function PaymentPageContent() {
         </Link>
         <div>
           <h1 className="font-serif text-2xl font-semibold text-foreground md:text-3xl">
-            Pay for Consultation
+            Mock M-Pesa (Demo)
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Pay securely with M-Pesa Ethiopia
+            Frontend-only demo payment flow
           </p>
         </div>
       </div>
@@ -346,8 +369,8 @@ function PaymentPageContent() {
                   </svg>
                 </div>
                 <div>
-                  <CardTitle className="text-lg">M-Pesa Ethiopia</CardTitle>
-                  <CardDescription>Pay with your mobile money</CardDescription>
+                  <CardTitle className="text-lg">M-Pesa Demo</CardTitle>
+                  <CardDescription>Frontend simulation (no real charge)</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -415,7 +438,7 @@ function PaymentPageContent() {
           <Card className="border-dashed">
             <CardContent className="p-4">
               <p className="text-sm text-muted-foreground">
-                <strong className="text-foreground">Need help?</strong> Make sure your M-Pesa account is active and has sufficient balance. Contact support if you experience any issues.
+                <strong className="text-foreground">Demo note:</strong> This is a mock M-Pesa flow for frontend UX only. No backend payment request is sent.
               </p>
             </CardContent>
           </Card>

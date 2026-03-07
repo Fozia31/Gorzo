@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Dialog,
@@ -48,7 +49,9 @@ import {
   Eye,
   Calendar,
   Clock,
-  Info
+  Info,
+  CircleAlert,
+  CheckCircle2,
 } from "lucide-react"
 
 type DoctorRow = {
@@ -70,6 +73,11 @@ const specialties = [
   "General Practitioner"
 ]
 
+type PageMessage = {
+  type: "success" | "error"
+  text: string
+}
+
 export default function AdminDashboardPage() {
   const { user, login } = useAuth()
   const [doctors, setDoctors] = useState<DoctorRow[]>([])
@@ -80,6 +88,7 @@ export default function AdminDashboardPage() {
   const [isLoadingProfile, setIsLoadingProfile] = useState(false)
   const [selectedDoctorProfile, setSelectedDoctorProfile] = useState<any | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [pageMessage, setPageMessage] = useState<PageMessage | null>(null)
   const [newDoctor, setNewDoctor] = useState({
     name: "",
     email: "",
@@ -145,10 +154,14 @@ export default function AdminDashboardPage() {
 
   const handleAddDoctor = async () => {
     if (!adminId) {
-      alert("Admin profile not found. Please log in with a valid admin account.")
+      setPageMessage({
+        type: "error",
+        text: "Admin profile not found. Please log in with a valid admin account.",
+      })
       return
     }
 
+    setPageMessage(null)
     setIsSavingDoctor(true)
     try {
       const created = await createDoctorByAdmin(adminId, {
@@ -171,9 +184,12 @@ export default function AdminDashboardPage() {
       setDoctors((prev) => [mapped, ...prev])
       setNewDoctor({ name: "", email: "", specialty: "Gynecologist", tempPassword: "" })
       setIsAddOpen(false)
-      alert("Doctor account created. The doctor can now log in from Doctor Portal using this email/password.")
+      setPageMessage({
+        type: "success",
+        text: "Doctor account created. The doctor can now log in from Doctor Portal using this email/password.",
+      })
     } catch (err: any) {
-      alert(err?.message || "Failed to create doctor account")
+      setPageMessage({ type: "error", text: err?.message || "Failed to create doctor account" })
     } finally {
       setIsSavingDoctor(false)
     }
@@ -182,10 +198,12 @@ export default function AdminDashboardPage() {
   const handleDeleteDoctor = async (id: string) => {
     if (confirm("Are you sure you want to remove this doctor?")) {
       try {
+        setPageMessage(null)
         await deleteDoctorById(String(id))
         setDoctors(doctors.filter(d => d.id !== id))
+        setPageMessage({ type: "success", text: "Doctor removed successfully." })
       } catch (err: any) {
-        alert(err?.message || "Failed to remove doctor")
+        setPageMessage({ type: "error", text: err?.message || "Failed to remove doctor" })
       }
     }
   }
@@ -204,7 +222,7 @@ export default function AdminDashboardPage() {
       const doctor = await getDoctorById(String(doctorId))
       setSelectedDoctorProfile(doctor)
     } catch (err: any) {
-      alert(err?.message || "Failed to load doctor profile")
+      setPageMessage({ type: "error", text: err?.message || "Failed to load doctor profile" })
       setIsProfileOpen(false)
     } finally {
       setIsLoadingProfile(false)
@@ -228,6 +246,24 @@ export default function AdminDashboardPage() {
           Manage healthcare professionals on the platform
         </p>
       </div>
+
+      {pageMessage && (
+        <Alert
+          variant={pageMessage.type === "error" ? "destructive" : "default"}
+          className={
+            pageMessage.type === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900 [&>svg]:text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200"
+              : ""
+          }
+        >
+          {pageMessage.type === "error" ? (
+            <CircleAlert className="h-4 w-4" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4" />
+          )}
+          <AlertDescription>{pageMessage.text}</AlertDescription>
+        </Alert>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

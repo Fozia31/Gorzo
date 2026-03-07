@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -22,6 +23,8 @@ import {
   Trash2,
   EyeOff,
   CheckCircle,
+  CheckCircle2,
+  CircleAlert,
   AlertTriangle,
   Clock,
 } from "lucide-react"
@@ -53,6 +56,11 @@ type ModerationItem = {
   reportsCount: number
 }
 
+type ActionMessage = {
+  type: "success" | "error"
+  text: string
+}
+
 const REPORT_THRESHOLD = 5
 
 export default function ModerationPage() {
@@ -62,6 +70,7 @@ export default function ModerationPage() {
   const [filter, setFilter] = useState("pending")
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState("")
+  const [actionMessage, setActionMessage] = useState<ActionMessage | null>(null)
 
   const pendingReports = reports.filter((r) => r.status === "pending")
   const resolvedReports = reports.filter((r) => r.status === "resolved")
@@ -108,6 +117,7 @@ export default function ModerationPage() {
     if (!selectedReport) return
 
     try {
+      setActionMessage(null)
       if (action === "delete") {
         await deletePost(selectedReport.postId)
       }
@@ -124,8 +134,12 @@ export default function ModerationPage() {
           return r
         })
       )
+      setActionMessage({
+        type: "success",
+        text: action === "delete" ? "Post removed successfully." : "Report marked as ignored.",
+      })
     } catch (error: any) {
-      alert(error?.message || "Failed to apply moderation action")
+      setActionMessage({ type: "error", text: error?.message || "Failed to apply moderation action" })
     } finally {
       setSelectedReport(null)
       setActionType(null)
@@ -150,6 +164,24 @@ export default function ModerationPage() {
           Review and moderate reported content
         </p>
       </div>
+
+      {actionMessage && (
+        <Alert
+          variant={actionMessage.type === "error" ? "destructive" : "default"}
+          className={
+            actionMessage.type === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900 [&>svg]:text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200"
+              : ""
+          }
+        >
+          {actionMessage.type === "error" ? (
+            <CircleAlert className="h-4 w-4" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4" />
+          )}
+          <AlertDescription>{actionMessage.text}</AlertDescription>
+        </Alert>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">

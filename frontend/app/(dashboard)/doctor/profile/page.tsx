@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useAuth } from "@/lib/auth-context"
 import { getDoctorByUserId, updateDoctorById } from "@/api/doctorApi"
 import { updateUserById } from "@/api/userApi"
-import { Calendar, Save, Stethoscope, User, Mail, ShieldCheck, Upload } from "lucide-react"
+import { Calendar, Save, Stethoscope, User, Mail, ShieldCheck, Upload, CircleAlert, CheckCircle2 } from "lucide-react"
 
 const specialties = [
   "Gynecologist",
@@ -22,12 +23,18 @@ const specialties = [
   "General Practitioner",
 ]
 
+type PageMessage = {
+  type: "success" | "error"
+  text: string
+}
+
 export default function DoctorProfilePage() {
   const { user, login } = useAuth()
   const [doctorRecordId, setDoctorRecordId] = useState("")
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState("")
+  const [pageMessage, setPageMessage] = useState<PageMessage | null>(null)
 
   const [form, setForm] = useState({
     displayName: "",
@@ -80,13 +87,13 @@ export default function DoctorProfilePage() {
     if (!file) return
 
     if (!file.type.startsWith("image/")) {
-      alert("Please select a valid image file")
+      setPageMessage({ type: "error", text: "Please select a valid image file" })
       return
     }
 
     const maxSizeBytes = 2 * 1024 * 1024
     if (file.size > maxSizeBytes) {
-      alert("Image must be 2MB or smaller")
+      setPageMessage({ type: "error", text: "Image must be 2MB or smaller" })
       return
     }
 
@@ -99,23 +106,23 @@ export default function DoctorProfilePage() {
       })
       setAvatarPreview(dataUrl)
     } catch {
-      alert("Failed to process image")
+      setPageMessage({ type: "error", text: "Failed to process image" })
     }
   }
 
   const handleSave = async () => {
     if (!user?.id || !doctorRecordId) {
-      alert("Unable to save profile. Missing doctor identity.")
+      setPageMessage({ type: "error", text: "Unable to save profile. Missing doctor identity." })
       return
     }
 
     if (!form.displayName.trim()) {
-      alert("Display name is required")
+      setPageMessage({ type: "error", text: "Display name is required" })
       return
     }
 
     if (form.password && form.password.length < 8) {
-      alert("Password must be at least 8 characters")
+      setPageMessage({ type: "error", text: "Password must be at least 8 characters" })
       return
     }
 
@@ -140,9 +147,9 @@ export default function DoctorProfilePage() {
       })
 
       setForm((prev) => ({ ...prev, password: "" }))
-      alert("Profile updated successfully")
+      setPageMessage({ type: "success", text: "Profile updated successfully" })
     } catch (err: any) {
-      alert(err?.message || "Failed to update profile")
+      setPageMessage({ type: "error", text: err?.message || "Failed to update profile" })
     } finally {
       setIsSaving(false)
     }
@@ -154,6 +161,20 @@ export default function DoctorProfilePage() {
         <h1 className="font-serif text-2xl font-semibold text-foreground md:text-3xl">Doctor Profile</h1>
         <p className="mt-1 text-sm text-muted-foreground">Update your professional information and account details</p>
       </div>
+
+      {pageMessage && (
+        <Alert
+          variant={pageMessage.type === "error" ? "destructive" : "default"}
+          className={
+            pageMessage.type === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900 [&>svg]:text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200"
+              : ""
+          }
+        >
+          {pageMessage.type === "error" ? <CircleAlert className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+          <AlertDescription>{pageMessage.text}</AlertDescription>
+        </Alert>
+      )}
 
       <Card>
         <CardHeader>

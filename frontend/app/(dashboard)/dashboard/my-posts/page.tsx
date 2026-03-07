@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   Dialog,
@@ -42,6 +43,8 @@ import {
   Trash2,
   FileText,
   Eye,
+  CircleAlert,
+  CheckCircle2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
@@ -59,6 +62,11 @@ type MyPost = {
   comments: number
   timeAgo: string
   createdAt: string
+}
+
+type PageMessage = {
+  type: "success" | "error"
+  text: string
 }
 
 const categories = [
@@ -80,6 +88,7 @@ export default function MyPostsPage() {
   const [editingPost, setEditingPost] = useState<MyPost | null>(null)
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ title: "", content: "", category: "" })
+  const [pageMessage, setPageMessage] = useState<PageMessage | null>(null)
 
   const fetchMyPosts = async () => {
     if (!user?.id) {
@@ -106,7 +115,7 @@ export default function MyPostsPage() {
       setPosts(mapped)
     } catch (error) {
       console.error("Failed to load user posts", error)
-      alert("Failed to load your posts")
+      setPageMessage({ type: "error", text: "Failed to load your posts" })
     } finally {
       setLoading(false)
     }
@@ -149,9 +158,10 @@ export default function MyPostsPage() {
       )
       setEditingPost(null)
       setEditForm({ title: "", content: "", category: "" })
+      setPageMessage({ type: "success", text: "Post updated successfully." })
     } catch (error) {
       console.error("Failed to update post", error)
-      alert("Failed to update post")
+      setPageMessage({ type: "error", text: "Failed to update post" })
     }
   }
 
@@ -160,9 +170,10 @@ export default function MyPostsPage() {
       await deletePost(postId)
       setPosts((prev) => prev.filter((post) => post.id !== postId))
       setDeletingPostId(null)
+      setPageMessage({ type: "success", text: "Post deleted successfully." })
     } catch (error) {
       console.error("Failed to delete post", error)
-      alert("Failed to delete post")
+      setPageMessage({ type: "error", text: "Failed to delete post" })
     }
   }
 
@@ -195,6 +206,24 @@ export default function MyPostsPage() {
           </Button>
         </Link>
       </div>
+
+      {pageMessage && (
+        <Alert
+          variant={pageMessage.type === "error" ? "destructive" : "default"}
+          className={
+            pageMessage.type === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900 [&>svg]:text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200"
+              : ""
+          }
+        >
+          {pageMessage.type === "error" ? (
+            <CircleAlert className="h-4 w-4" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4" />
+          )}
+          <AlertDescription>{pageMessage.text}</AlertDescription>
+        </Alert>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">

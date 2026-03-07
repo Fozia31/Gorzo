@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -17,6 +18,7 @@ import {
   MessageCircle,
   Star,
   CheckCircle,
+  CheckCircle2,
   Sparkles,
   Send,
   Shield,
@@ -29,7 +31,8 @@ import {
   Trash2,
   AlertTriangle,
   Plus,
-  Lock
+  Lock,
+  CircleAlert,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
@@ -125,7 +128,7 @@ const mapBackendDoctorsToUi = (backendDoctors: any[]) => {
       userId: String(item?.userId?._id || ""),
       name: displayName,
       specialty,
-      avatar: item?.userId?.avatar || "/doctors/placeholder.jpg",
+      avatar: item?.userId?.avatar || "/logo.jpg",
       rating: 0,
       totalReviews: 0,
       available,
@@ -178,6 +181,11 @@ type ChatRoom = {
     content: string
     time: string
   }[]
+}
+
+type PageMessage = {
+  type: "success" | "error"
+  text: string
 }
 
 const formatChatTime = (dateValue?: string | Date) => {
@@ -607,10 +615,10 @@ function PaymentDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Crown className="h-5 w-5 text-primary" />
-            Pay for Consultation
+            Mock Payment for Consultation
           </DialogTitle>
           <DialogDescription>
-            One-time payment to access chat with {doctor.name}
+            Frontend demo payment to access chat with {doctor.name}
           </DialogDescription>
         </DialogHeader>
         
@@ -656,12 +664,15 @@ function PaymentDialog({
 
           <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
             <Shield className="h-3 w-3" />
-            <span>Secure payment via M-Pesa Ethiopia</span>
+            <span>Mock M-Pesa demo (frontend only)</span>
           </div>
         </div>
 
         <div className="flex flex-col gap-2">
-          <Link href={`/dashboard/payment?doctor=${doctor.id}&amount=${doctor.consultationFee}`} className="w-full">
+          <Link
+            href={`/dashboard/payment?doctor=${encodeURIComponent(String(doctor.id))}&doctorRecordId=${encodeURIComponent(doctor.doctorRecordId)}&doctorName=${encodeURIComponent(doctor.name)}&specialty=${encodeURIComponent(doctor.specialty)}&rating=${encodeURIComponent(String(doctor.rating))}&avatar=${encodeURIComponent(doctor.avatar || "/logo.jpg")}&amount=${encodeURIComponent(String(doctor.consultationFee))}`}
+            className="w-full"
+          >
             <Button className="w-full gap-2">
               <Sparkles className="h-4 w-4" />
               Pay {doctor.consultationFee} ETB
@@ -849,6 +860,12 @@ export default function ConsultingPage() {
   const [paidDoctorIds, setPaidDoctorIds] = useState<number[]>([])
   
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([])
+  const [pageMessage, setPageMessage] = useState<PageMessage | null>(null)
+
+  const upsertLocalChatRoom = (doctor: DoctorProfile) => {
+    const localChatId = `local-${String(doctor.id)}`
+    return upsertChatRoom(localChatId, doctor, new Date())
+  }
 
   const upsertChatRoom = (chatId: string, doctor: DoctorProfile, createdAt?: string | Date) => {
     const room: ChatRoom = {
@@ -1006,6 +1023,9 @@ export default function ConsultingPage() {
     const loadMessages = async () => {
       if (!selectedChatRoom?.id) return
 
+      // Frontend-only local chats do not fetch from backend.
+      if (selectedChatRoom.id.startsWith("local-")) return
+
       try {
         const response = await getMessagesByChat(selectedChatRoom.id, { limit: 200 })
         const items = Array.isArray(response?.data) ? response.data : []
@@ -1033,34 +1053,27 @@ export default function ConsultingPage() {
     if (params.get("payment") !== "success" || paymentHandledRef.current) return
 
     const doctorId = params.get("doctor")
-    if (!doctorId || !user?.id) return
+    const doctorRecordId = params.get("doctorRecordId")
 
-    const docId = Number(doctorId)
-    const doctor = doctorsList.find((item) => item.id === docId)
-    if (!doctor?.doctorRecordId) return
+    const doctor = doctorRecordId
+      ? doctorsList.find((item) => item.doctorRecordId === doctorRecordId)
+      : doctorId
+        ? doctorsList.find((item) => item.id === Number(doctorId))
+        : undefined
+    if (!doctor) return
+
+    const docId = Number(doctor.id)
 
     paymentHandledRef.current = true
 
-    const completePaymentFlow = async () => {
-      try {
-        const chat = await getOrCreateDoctorChat({ doctorId: doctor.doctorRecordId, userId: user.id })
-        const chatId = String(chat?._id || "")
-        if (!chatId) return
+    setPaidDoctorIds((prev) => (prev.includes(docId) ? prev : [...prev, docId]))
+    const room = upsertLocalChatRoom(doctor)
+    setSelectedDoctor(doctor)
+    setSelectedChatRoom(room)
+    setView("chat")
 
-        setPaidDoctorIds((prev) => (prev.includes(docId) ? prev : [...prev, docId]))
-        const room = upsertChatRoom(chatId, doctor, chat?.createdAt || chat?.updatedAt)
-        setSelectedDoctor(doctor)
-        setSelectedChatRoom(room)
-        setView("chat")
-      } catch {
-        alert("Payment succeeded but failed to open chat. Please try from Consulting page.")
-      }
-    }
-
-    void completePaymentFlow().finally(() => {
-      window.history.replaceState({}, "", "/dashboard/consulting")
-    })
-  }, [doctorsList, user?.id])
+    window.history.replaceState({}, "", "/dashboard/consulting")
+  }, [doctorsList])
 
   const hasPaidForDoctor = (doctorId: number) => paidDoctorIds.includes(doctorId)
 
@@ -1074,31 +1087,16 @@ export default function ConsultingPage() {
 
   const handleContactDoctor = async () => {
     if (!selectedDoctor) return
-    
-    if (hasPaidForDoctor(selectedDoctor.id)) {
-      if (!user?.id || !selectedDoctor.doctorRecordId) {
-        alert("Unable to open chat right now. Please try again.")
-        return
-      }
 
-      try {
-        const chat = await getOrCreateDoctorChat({
-          doctorId: selectedDoctor.doctorRecordId,
-          userId: user.id,
-        })
-
-        const chatId = String(chat?._id || "")
-        if (!chatId) throw new Error("Missing chat id")
-
-        const room = upsertChatRoom(chatId, selectedDoctor, chat?.createdAt || chat?.updatedAt)
-        setSelectedChatRoom(room)
-        setView("chat")
-      } catch {
-        alert("Failed to open chat. Please try again.")
-      }
-    } else {
+    // Frontend-only mock M-Pesa flow: require local "paid" state before opening chat.
+    if (!hasPaidForDoctor(Number(selectedDoctor.id))) {
       setShowPaymentDialog(true)
+      return
     }
+
+    const room = upsertLocalChatRoom(selectedDoctor)
+    setSelectedChatRoom(room)
+    setView("chat")
   }
 
   const handleOpenExistingChat = (chatRoom: ChatRoom) => {
@@ -1130,7 +1128,7 @@ export default function ConsultingPage() {
 
       await refreshDoctorReviews(selectedDoctor, 1, false)
     } catch {
-      alert("Failed to submit rating. Please try again.")
+      setPageMessage({ type: "error", text: "Failed to submit rating. Please try again." })
     }
   }
 
@@ -1153,6 +1151,29 @@ export default function ConsultingPage() {
 
   const handleSendChatMessage = async (messageText: string) => {
     if (!selectedChatRoom?.id || !user?.id) return
+
+    if (selectedChatRoom.id.startsWith("local-")) {
+      const uiMessage = {
+        id: `${Date.now()}`,
+        sender: "user" as const,
+        content: messageText,
+        time: "Just now",
+      }
+
+      setChatRooms((prev) =>
+        prev.map((room) =>
+          room.id === selectedChatRoom.id
+            ? { ...room, messages: [...room.messages, uiMessage] }
+            : room
+        )
+      )
+      setSelectedChatRoom((prev) =>
+        prev && prev.id === selectedChatRoom.id
+          ? { ...prev, messages: [...prev.messages, uiMessage] }
+          : prev
+      )
+      return
+    }
 
     setIsSendingMessage(true)
     try {
@@ -1178,16 +1199,35 @@ export default function ConsultingPage() {
           : prev
       )
     } catch {
-      alert("Failed to send message. Please try again.")
+      setPageMessage({ type: "error", text: "Failed to send message. Please try again." })
     } finally {
       setIsSendingMessage(false)
     }
   }
 
+  const messageBanner = pageMessage ? (
+    <Alert
+      variant={pageMessage.type === "error" ? "destructive" : "default"}
+      className={
+        pageMessage.type === "success"
+          ? "border-emerald-200 bg-emerald-50 text-emerald-900 [&>svg]:text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200"
+          : ""
+      }
+    >
+      {pageMessage.type === "error" ? (
+        <CircleAlert className="h-4 w-4" />
+      ) : (
+        <CheckCircle2 className="h-4 w-4" />
+      )}
+      <AlertDescription>{pageMessage.text}</AlertDescription>
+    </Alert>
+  ) : null
+
   // Chat Room View
   if (view === "chat" && selectedChatRoom) {
     return (
       <>
+        {messageBanner}
         <ChatRoomView 
           chatRoom={selectedChatRoom}
           onBack={handleBack}
@@ -1210,6 +1250,7 @@ export default function ConsultingPage() {
   if (view === "profile" && selectedDoctor) {
     return (
       <>
+        {messageBanner}
         <DoctorProfileView 
           doctor={selectedDoctor}
           onBack={handleBack}
@@ -1231,6 +1272,7 @@ export default function ConsultingPage() {
   // Doctors List View (default)
   return (
     <div className="space-y-6 p-4 md:p-6">
+      {messageBanner}
       {/* Header */}
       <div>
         <h1 className="font-serif text-2xl font-semibold text-foreground md:text-3xl">

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
@@ -50,6 +51,7 @@ import {
   BookOpen,
   Calendar,
   CheckCircle2,
+  CircleAlert,
   Pencil,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -82,6 +84,11 @@ type PatientOption = {
   avatar: string
 }
 
+type PageMessage = {
+  type: "success" | "error"
+  text: string
+}
+
 const buildPatientAvatar = (username: string) =>
   username
     .split(" ")
@@ -110,6 +117,7 @@ export default function VoiceNotesPage() {
   const [selectedPatient, setSelectedPatient] = useState("")
   const [sendDialogOpen, setSendDialogOpen] = useState(false)
   const [recordedAudio, setRecordedAudio] = useState<{ url: string; durationSec: number } | null>(null)
+  const [pageMessage, setPageMessage] = useState<PageMessage | null>(null)
   const [isEditArticleDialogOpen, setIsEditArticleDialogOpen] = useState(false)
   const [editingArticleId, setEditingArticleId] = useState<string>("")
   const [isSavingArticleEdit, setIsSavingArticleEdit] = useState(false)
@@ -291,7 +299,7 @@ export default function VoiceNotesPage() {
         setRecordingTime((prev) => prev + 1)
       }, 1000)
     } catch {
-      alert("Microphone access denied or unavailable.")
+      setPageMessage({ type: "error", text: "Microphone access denied or unavailable." })
     }
   }
 
@@ -323,7 +331,7 @@ export default function VoiceNotesPage() {
         })
         setHasRecording(true)
       } catch {
-        alert("Failed to upload recording. Please try again.")
+        setPageMessage({ type: "error", text: "Failed to upload recording. Please try again." })
         setHasRecording(false)
       } finally {
         setIsUploadingAudio(false)
@@ -393,7 +401,7 @@ export default function VoiceNotesPage() {
         setSelectedPatient("")
         setSendDialogOpen(false)
       } catch {
-        alert("Failed to send insight. Please try again.")
+        setPageMessage({ type: "error", text: "Failed to send insight. Please try again." })
       }
     }
 
@@ -412,7 +420,7 @@ export default function VoiceNotesPage() {
         }
         setVoiceNotes((prev) => prev.filter((item) => item.id !== id))
       } catch {
-        alert("Failed to delete insight.")
+        setPageMessage({ type: "error", text: "Failed to delete insight." })
       }
     }
 
@@ -446,7 +454,7 @@ export default function VoiceNotesPage() {
     if (!editingArticleId) return
     const trimmedTitle = editArticleData.title.trim()
     if (!trimmedTitle) {
-      alert("Title is required.")
+      setPageMessage({ type: "error", text: "Title is required." })
       return
     }
 
@@ -474,9 +482,9 @@ export default function VoiceNotesPage() {
 
       setIsEditArticleDialogOpen(false)
       setEditingArticleId("")
-      alert("Article updated successfully!")
+      setPageMessage({ type: "success", text: "Article updated successfully!" })
     } catch {
-      alert("Failed to update article.")
+      setPageMessage({ type: "error", text: "Failed to update article." })
     } finally {
       setIsSavingArticleEdit(false)
     }
@@ -508,6 +516,20 @@ export default function VoiceNotesPage() {
           New Insight
         </Button>
       </div>
+
+      {pageMessage && (
+        <Alert
+          variant={pageMessage.type === "error" ? "destructive" : "default"}
+          className={
+            pageMessage.type === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900 [&>svg]:text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200"
+              : ""
+          }
+        >
+          {pageMessage.type === "error" ? <CircleAlert className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+          <AlertDescription>{pageMessage.text}</AlertDescription>
+        </Alert>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

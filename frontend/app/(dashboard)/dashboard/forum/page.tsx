@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   Dialog,
@@ -34,6 +35,8 @@ import {
   MoreHorizontal, 
   Plus,
   Search,
+  CircleAlert,
+  CheckCircle2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -50,6 +53,11 @@ const categories = [
   "Relationships",
 ]
 
+type PageMessage = {
+  type: "success" | "error"
+  text: string
+}
+
 export default function ForumPage() {
   const { user } = useAuth()
   const [posts, setPosts] = useState<any[]>([])
@@ -65,10 +73,11 @@ export default function ForumPage() {
   const [commentsMap, setCommentsMap] = useState<Record<string, any[]>>({})
   const [commentText, setCommentText] = useState("")
   const [userEngagements, setUserEngagements] = useState<Record<string, { Like?: any; Repost?: any; Report?: any }>>({})
+  const [pageMessage, setPageMessage] = useState<PageMessage | null>(null)
 
   const handleLike = async (postId: string) => {
     if (!user) {
-      alert("You must be logged in to like posts")
+      setPageMessage({ type: "error", text: "You must be logged in to like posts" })
       return
     }
 
@@ -113,13 +122,13 @@ export default function ForumPage() {
       }
     } catch (error) {
       console.error("Failed to toggle like:", error)
-      alert("Failed to update like. Please try again.")
+      setPageMessage({ type: "error", text: "Failed to update like. Please try again." })
     }
   }
 
   const handleRepost = async (postId: string) => {
     if (!user) {
-      alert("You must be logged in to repost")
+      setPageMessage({ type: "error", text: "You must be logged in to repost" })
       return
     }
 
@@ -162,18 +171,18 @@ export default function ForumPage() {
       }
     } catch (error) {
       console.error("Failed to toggle repost:", error)
-      alert("Failed to update repost. Please try again.")
+      setPageMessage({ type: "error", text: "Failed to update repost. Please try again." })
     }
   }
 
   const handleReport = async (postId: string) => {
     if (!user) {
-      alert("Please log in to report this post.")
+      setPageMessage({ type: "error", text: "Please log in to report this post." })
       return
     }
 
     if (userEngagements[postId]?.Report) {
-      alert("You have already reported this post.")
+      setPageMessage({ type: "error", text: "You have already reported this post." })
       return
     }
 
@@ -193,14 +202,14 @@ export default function ForumPage() {
         },
       }))
 
-      alert("Post reported successfully.")
+      setPageMessage({ type: "success", text: "Post reported successfully." })
     } catch (error: any) {
       console.error("Failed to report post:", error)
       if (error?.statusCode === 409) {
-        alert("You have already reported this post.")
+        setPageMessage({ type: "error", text: "You have already reported this post." })
         return
       }
-      alert(error?.message || "Unable to report this post. Please try again.")
+      setPageMessage({ type: "error", text: error?.message || "Unable to report this post. Please try again." })
     }
   }
 
@@ -212,7 +221,7 @@ export default function ForumPage() {
       setCommentDialogOpen(true)
     } catch (err) {
       console.error("failed to load comments", err)
-      alert("Could not load comments")
+      setPageMessage({ type: "error", text: "Could not load comments" })
     }
   }
 
@@ -245,13 +254,13 @@ export default function ForumPage() {
       setCommentText("")
     } catch (err) {
       console.error("add comment error", err)
-      alert("Failed to add comment")
+      setPageMessage({ type: "error", text: "Failed to add comment" })
     }
   }
 
   const handleCreatePost = async () => {
     if (!user) {
-      alert("You must be logged in to post")
+      setPageMessage({ type: "error", text: "You must be logged in to post" })
       return
     }
 
@@ -286,7 +295,7 @@ export default function ForumPage() {
       setIsCreateOpen(false)
     } catch (err: any) {
       console.error("create post error", err)
-      alert(err?.message || "Failed to create post")
+      setPageMessage({ type: "error", text: err?.message || "Failed to create post" })
     }
   }
 
@@ -448,6 +457,24 @@ export default function ForumPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {pageMessage && (
+        <Alert
+          variant={pageMessage.type === "error" ? "destructive" : "default"}
+          className={
+            pageMessage.type === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900 [&>svg]:text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200"
+              : ""
+          }
+        >
+          {pageMessage.type === "error" ? (
+            <CircleAlert className="h-4 w-4" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4" />
+          )}
+          <AlertDescription>{pageMessage.text}</AlertDescription>
+        </Alert>
+      )}
 
       {/* Search and Filter */}
       <div className="flex flex-col gap-4 md:flex-row">

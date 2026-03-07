@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -68,7 +69,9 @@ import {
   File,
   FileImage,
   FileType,
-  Download
+  Download,
+  CircleAlert,
+  CheckCircle2,
 } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
@@ -117,6 +120,11 @@ const emptyRatingStats = {
   ],
   thisMonth: 0,
   lastMonth: 0,
+}
+
+type PageMessage = {
+  type: "success" | "error"
+  text: string
 }
 
 // Days of the week
@@ -237,6 +245,7 @@ export default function DoctorDashboardPage() {
   } | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [isUploadingAudio, setIsUploadingAudio] = useState(false)
+  const [pageMessage, setPageMessage] = useState<PageMessage | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const audioInputRef = useRef<HTMLInputElement>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
@@ -381,7 +390,7 @@ export default function DoctorDashboardPage() {
         setRecordingTime((prev) => prev + 1)
       }, 1000)
     } catch {
-      alert("Microphone access denied or unavailable.")
+      setPageMessage({ type: "error", text: "Microphone access denied or unavailable." })
     }
   }
 
@@ -415,7 +424,7 @@ export default function DoctorDashboardPage() {
         })
         setHasRecording(true)
       } catch {
-        alert("Failed to save recorded audio. Please try again.")
+        setPageMessage({ type: "error", text: "Failed to save recorded audio. Please try again." })
         setHasRecording(false)
       } finally {
         setIsUploadingAudio(false)
@@ -469,7 +478,7 @@ export default function DoctorDashboardPage() {
   const handlePublish = async () => {
     const resolvedDoctorId = await resolveDoctorRecordId()
     if (!resolvedDoctorId) {
-      alert("Doctor profile not found. Please sign in with a doctor account linked by admin.")
+      setPageMessage({ type: "error", text: "Doctor profile not found. Please sign in with a doctor account linked by admin." })
       return
     }
 
@@ -480,12 +489,12 @@ export default function DoctorDashboardPage() {
     const hasText = Boolean(trimmedContent)
 
     if (!trimmedTitle) {
-      alert("Please add an article title before publishing.")
+      setPageMessage({ type: "error", text: "Please add an article title before publishing." })
       return
     }
 
     if (!hasText && !hasAudio && !hasFiles) {
-      alert("Add article content, audio, or file attachment before publishing.")
+      setPageMessage({ type: "error", text: "Add article content, audio, or file attachment before publishing." })
       return
     }
 
@@ -528,14 +537,14 @@ export default function DoctorDashboardPage() {
       setRecordingTime(0)
       setUploadedFiles([])
       setUploadedAudio(null)
-      alert("Article published successfully!")
+      setPageMessage({ type: "success", text: "Article published successfully!" })
     } catch (error: any) {
       const apiMessage =
         error?.message ||
         error?.error ||
         error?.response?.data?.message ||
         "Failed to publish article. Please try again."
-      alert(apiMessage)
+      setPageMessage({ type: "error", text: apiMessage })
     } finally {
       setIsPublishing(false)
     }
@@ -559,7 +568,7 @@ export default function DoctorDashboardPage() {
         : []
       setUploadedFiles((prev) => [...prev, ...newFiles])
     } catch {
-      alert("Failed to upload files. Please try again.")
+      setPageMessage({ type: "error", text: "Failed to upload files. Please try again." })
     } finally {
       setIsUploading(false)
       if (fileInputRef.current) {
@@ -584,7 +593,7 @@ export default function DoctorDashboardPage() {
       setHasRecording(true)
       setRecordingTime(0)
     } catch {
-      alert("Failed to upload audio. Please try again.")
+      setPageMessage({ type: "error", text: "Failed to upload audio. Please try again." })
     } finally {
       setIsUploadingAudio(false)
       if (audioInputRef.current) {
@@ -621,7 +630,7 @@ export default function DoctorDashboardPage() {
     const trimmedTitle = editArticleData.title.trim()
 
     if (!trimmedTitle) {
-      alert("Article title is required.")
+      setPageMessage({ type: "error", text: "Article title is required." })
       return
     }
 
@@ -662,9 +671,9 @@ export default function DoctorDashboardPage() {
 
       setIsEditArticleDialogOpen(false)
       setEditingArticleId(null)
-      alert("Article updated successfully!")
+      setPageMessage({ type: "success", text: "Article updated successfully!" })
     } catch {
-      alert("Failed to update article. Please try again.")
+      setPageMessage({ type: "error", text: "Failed to update article. Please try again." })
     } finally {
       setIsSavingArticleEdit(false)
     }
@@ -685,9 +694,9 @@ export default function DoctorDashboardPage() {
         ...prev,
         publishedArticles: Math.max(0, prev.publishedArticles - 1),
       }))
-      alert("Article deleted successfully!")
+      setPageMessage({ type: "success", text: "Article deleted successfully!" })
     } catch {
-      alert("Failed to delete article. Please try again.")
+      setPageMessage({ type: "error", text: "Failed to delete article. Please try again." })
     } finally {
       setDeletingArticleId(null)
     }
@@ -724,7 +733,7 @@ export default function DoctorDashboardPage() {
           messageType: "text",
           messageText: messageToSend,
         })
-        alert(`Message sent to ${selectedPatient.username}`)
+        setPageMessage({ type: "success", text: `Message sent to ${selectedPatient.username}` })
         setMessageToSend("")
       } else if (type === "voice" && hasRecording) {
         await sendMessage({
@@ -735,13 +744,13 @@ export default function DoctorDashboardPage() {
           voiceUrl: "local://voice-note",
           durationSec: recordingTime,
         })
-        alert(`Insight sent to ${selectedPatient.username}`)
+        setPageMessage({ type: "success", text: `Insight sent to ${selectedPatient.username}` })
         setHasRecording(false)
         setRecordingTime(0)
         setSendingVoiceNote(false)
       }
     } catch {
-      alert("Failed to send message. Please try again.")
+      setPageMessage({ type: "error", text: "Failed to send message. Please try again." })
     }
   }
 
@@ -797,9 +806,9 @@ export default function DoctorDashboardPage() {
     try {
       if (!doctorRecordId) throw new Error("Missing doctor id")
       await updateDoctorAvailability(doctorRecordId, availabilityPayloadFromRecord(availability))
-      alert("Availability saved successfully!")
+      setPageMessage({ type: "success", text: "Availability saved successfully!" })
     } catch {
-      alert("Failed to save availability. Please try again.")
+      setPageMessage({ type: "error", text: "Failed to save availability. Please try again." })
     } finally {
       setIsSavingAvailability(false)
     }
@@ -830,6 +839,20 @@ export default function DoctorDashboardPage() {
           Manage your patients and create educational content
         </p>
       </div>
+
+      {pageMessage && (
+        <Alert
+          variant={pageMessage.type === "error" ? "destructive" : "default"}
+          className={
+            pageMessage.type === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900 [&>svg]:text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200"
+              : ""
+          }
+        >
+          {pageMessage.type === "error" ? <CircleAlert className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+          <AlertDescription>{pageMessage.text}</AlertDescription>
+        </Alert>
+      )}
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
