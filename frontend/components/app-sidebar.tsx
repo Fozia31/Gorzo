@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
 import {
   Home,
@@ -34,13 +35,14 @@ import { Badge } from "@/components/ui/badge"
 
 const womanNavItems = [
   { title: "Home", icon: Home, href: "/dashboard" },
-  { title: "Posts", icon: Users, href: "/dashboard/forum" },
+  { title: "Discuss with Sisters", icon: Users, href: "/dashboard/forum" },
+  { title: "My Posts", icon: FileText, href: "/dashboard/my-posts" },
   { title: "Knowledge Hub", icon: BookOpen, href: "/dashboard/knowledge" },
   { title: "Consulting", icon: MessageCircle, href: "/dashboard/consulting" },
 ]
 
 const doctorNavItems = [
-  { title: "Content Creator", icon: FileText, href: "/doctor" },
+  { title: "Info", icon: FileText, href: "/doctor" },
   { title: "Voice Notes", icon: Mic, href: "/doctor/voice-notes" },
   { title: "Premium Chat Queue", icon: Inbox, href: "/doctor/chats" },
 ]
@@ -77,13 +79,15 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="p-4">
-        <Link href={user?.role === "doctor" ? "/doctor" : user?.role === "admin" ? "/admin" : "/dashboard"} className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary">
-            <span className="font-serif text-lg font-bold text-secondary-foreground">G</span>
-          </div>
-          <div className="flex flex-col">
-            <span className="font-serif text-xl font-semibold tracking-tight text-sidebar-foreground">Gorzo</span>
-            <span className="text-xs text-sidebar-foreground/60">Women&apos;s Health</span>
+        <Link href={user?.role === "doctor" ? "/doctor" : user?.role === "admin" ? "/admin" : "/dashboard"} className="flex items-center">
+          <div className="h-12 w-12 overflow-hidden rounded-full border-2 border-sidebar-accent">
+            <Image 
+              src="/logo.jpg" 
+              alt="EFOY" 
+              width={48} 
+              height={48} 
+              className="h-full w-full object-cover"
+            />
           </div>
         </Link>
       </SidebarHeader>

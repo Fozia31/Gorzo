@@ -44,7 +44,11 @@ import {
   TrendingUp,
   ThumbsUp,
   Plus,
-  X
+  X,
+  File,
+  FileImage,
+  FileType,
+  Download
 } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
@@ -225,6 +229,9 @@ export default function DoctorDashboardPage() {
   })
   const [availability, setAvailability] = useState<Record<string, { enabled: boolean; slots: { start: string; end: string }[] }>>(initialAvailability)
   const [isSavingAvailability, setIsSavingAvailability] = useState(false)
+  const [uploadedFiles, setUploadedFiles] = useState<{ name: string; size: number; type: string }[]>([])
+  const [isUploading, setIsUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Auto-login for demo
@@ -272,6 +279,44 @@ export default function DoctorDashboardPage() {
     setArticleData({ title: "", category: "Hormones", content: "" })
     setHasRecording(false)
     setRecordingTime(0)
+    setUploadedFiles([])
+  }
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+
+    setIsUploading(true)
+    
+    // Simulate upload delay
+    setTimeout(() => {
+      const newFiles = Array.from(files).map(file => ({
+        name: file.name,
+        size: file.size,
+        type: file.type
+      }))
+      setUploadedFiles(prev => [...prev, ...newFiles])
+      setIsUploading(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
+    }, 1000)
+  }
+
+  const removeFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + " B"
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB"
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB"
+  }
+
+  const getFileIcon = (type: string) => {
+    if (type.startsWith("image/")) return FileImage
+    if (type.includes("pdf")) return FileType
+    return File
   }
 
   const handleSendMessage = (type: "text" | "voice") => {
@@ -437,7 +482,7 @@ export default function DoctorDashboardPage() {
           </TabsTrigger>
           <TabsTrigger value="create" className="gap-2">
             <FileText className="h-4 w-4" />
-            Content
+            Info
           </TabsTrigger>
           <TabsTrigger value="published" className="gap-2">
             <Eye className="h-4 w-4" />
@@ -908,6 +953,101 @@ export default function DoctorDashboardPage() {
                   className="resize-none"
                 />
               </div>
+            </CardContent>
+          </Card>
+
+          {/* File Upload Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Upload className="h-5 w-5 text-primary" />
+                Upload Files
+              </CardTitle>
+              <CardDescription>
+                Upload documents, PDFs, or images to include with your article
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.gif"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              
+              {/* Drop zone / Upload button */}
+              <div 
+                className="flex flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed border-border bg-muted/30 p-8 transition-colors hover:border-primary/50 hover:bg-muted/50 cursor-pointer"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {isUploading ? (
+                  <>
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                      <Upload className="h-6 w-6 text-primary animate-pulse" />
+                    </div>
+                    <p className="text-sm text-muted-foreground">Uploading...</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                      <Upload className="h-6 w-6 text-primary" />
+                    </div>
+                    <div className="text-center">
+                      <p className="font-medium">Click to upload files</p>
+                      <p className="text-sm text-muted-foreground">
+                        PDF, DOC, DOCX, PNG, JPG, or GIF (max 10MB)
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Uploaded files list */}
+              {uploadedFiles.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Uploaded Files ({uploadedFiles.length})</Label>
+                  <div className="space-y-2">
+                    {uploadedFiles.map((file, index) => {
+                      const FileIcon = getFileIcon(file.type)
+                      return (
+                        <div 
+                          key={index}
+                          className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background p-3"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                              <FileIcon className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium truncate max-w-[200px]">{file.name}</p>
+                              <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Download className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                removeFile(index)
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 

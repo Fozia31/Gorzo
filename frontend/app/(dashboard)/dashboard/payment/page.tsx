@@ -1,10 +1,9 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
+import { useState, Suspense } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { 
   CheckCircle2, 
@@ -19,8 +18,8 @@ import {
   MessageCircle
 } from "lucide-react"
 import Link from "next/link"
-import { cn } from "@/lib/utils"
 import { useSearchParams } from "next/navigation"
+import { useAuth } from "@/lib/auth-context"
 
 type PaymentStatus = "idle" | "processing" | "waiting" | "success" | "error"
 
@@ -64,6 +63,7 @@ function PaymentContent() {
   const searchParams = useSearchParams()
   const doctorId = searchParams.get("doctor")
   const amountParam = searchParams.get("amount")
+  const { updateTier } = useAuth()
   
   const [phoneNumber, setPhoneNumber] = useState("")
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("idle")
@@ -123,6 +123,9 @@ function PaymentContent() {
     // Simulate successful payment
     setTransactionId(`MP${Date.now().toString().slice(-10)}`)
     setPaymentStatus("success")
+    
+    // Upgrade user to premium status
+    updateTier("premium")
   }
 
   // Redirect if no doctor specified

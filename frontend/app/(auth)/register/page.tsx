@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Eye, EyeOff, Mail, Lock, User, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -65,11 +66,19 @@ export default function RegisterPage() {
   return (
     <div className="w-full max-w-md space-y-8">
       <div className="text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary">
-          <span className="font-serif text-2xl font-bold text-primary-foreground">G</span>
+        <div className="mx-auto flex flex-col items-center">
+          <div className="h-20 w-20 overflow-hidden rounded-full border-2 border-primary/20">
+            <Image 
+              src="/logo.jpg" 
+              alt="EFOY" 
+              width={80} 
+              height={80} 
+              className="h-full w-full object-cover"
+            />
+          </div>
         </div>
-        <h1 className="mt-6 font-serif text-3xl font-bold tracking-tight text-foreground">
-          Join our sisterhood
+        <h1 className="mt-4 font-serif text-3xl font-bold tracking-tight text-foreground">
+          Join our community
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Create your anonymous profile and start your wellness journey

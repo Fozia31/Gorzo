@@ -2,8 +2,9 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { Eye, EyeOff, User, Lock, Stethoscope, ShieldCheck } from "lucide-react"
+import { Eye, EyeOff, User, Lock, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -60,10 +61,18 @@ export default function DoctorLoginPage() {
   return (
     <div className="w-full max-w-md space-y-8">
       <div className="text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary">
-          <Stethoscope className="h-8 w-8 text-primary-foreground" />
+        <div className="mx-auto flex flex-col items-center">
+          <div className="h-20 w-20 overflow-hidden rounded-full border-2 border-primary/20">
+            <Image 
+              src="/logo.jpg" 
+              alt="EFOY" 
+              width={80} 
+              height={80} 
+              className="h-full w-full object-cover"
+            />
+          </div>
         </div>
-        <h1 className="mt-6 font-serif text-3xl font-bold tracking-tight text-foreground">
+        <h1 className="mt-4 font-serif text-3xl font-bold tracking-tight text-foreground">
           Doctor Portal
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
@@ -136,7 +145,7 @@ export default function DoctorLoginPage() {
                 <div className="text-xs text-muted-foreground">
                   <p className="font-medium text-foreground">Secure Access</p>
                   <p className="mt-1">
-                    Your credentials are provided by the Gorzo admin team. 
+                    Your credentials are provided by the EFOY admin team. 
                     If you need account assistance, please contact your administrator.
                   </p>
                 </div>
