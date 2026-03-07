@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { getSocket } from "@/lib/socket"
+import * as chatApi from "@/api/chatApi"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -21,106 +23,139 @@ import {
   User,
   ArrowLeft,
   ThumbsUp,
-  Calendar,
-  X,
-  Trash2,
-  AlertTriangle,
-  Plus
-} from "lucide-react"
-import { cn } from "@/lib/utils"
-import Link from "next/link"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+  Calendar
+} from "@/components/ui/icons";
 
-// Sample doctors with ratings and reviews from users
-const doctors = [
-  {
-    id: 1,
-    name: "Dr. Amara Bekele",
-    specialty: "Gynecologist",
-    avatar: "/doctors/amara.jpg",
-    rating: 4.9,
-    totalReviews: 156,
-    available: true,
-    responseTime: "Usually responds in 2 hours",
-    experience: "12 years",
-    bio: "Specialized in women's reproductive health, pregnancy care, and hormonal disorders.",
-    reviews: [
-      { id: 1, user: "Anonymous User", rating: 5, comment: "Very professional and caring. Made me feel comfortable discussing sensitive topics.", date: "2 weeks ago" },
-      { id: 2, user: "HealthyMama22", rating: 5, comment: "Dr. Amara helped me understand my cycle better. Highly recommend!", date: "1 month ago" },
-      { id: 3, user: "WellnessJourney", rating: 4, comment: "Good advice, though response took a bit longer than expected.", date: "1 month ago" },
-    ]
-  },
-  {
-    id: 2,
-    name: "Dr. Selam Haile",
-    specialty: "Nutritionist",
-    avatar: "/doctors/selam.jpg",
-    rating: 4.8,
-    totalReviews: 98,
-    available: true,
-    responseTime: "Usually responds in 3 hours",
-    experience: "8 years",
-    bio: "Expert in women's nutrition, weight management, and dietary planning for hormonal balance.",
-    reviews: [
-      { id: 1, user: "FitnessFocus", rating: 5, comment: "Her meal plans are practical and easy to follow. Lost 5kg in 2 months!", date: "3 weeks ago" },
-      { id: 2, user: "BusyMom123", rating: 5, comment: "Finally found a nutritionist who understands Ethiopian food culture.", date: "1 month ago" },
-      { id: 3, user: "Anonymous User", rating: 4, comment: "Very knowledgeable. Helped me with my PCOS diet.", date: "2 months ago" },
-    ]
-  },
-  {
-    id: 3,
-    name: "Dr. Hana Tadesse",
-    specialty: "Reproductive Health",
-    avatar: "/doctors/hana.jpg",
-    rating: 4.9,
-    totalReviews: 124,
-    available: false,
-    responseTime: "Currently unavailable",
-    experience: "15 years",
-    bio: "Specializes in fertility, family planning, and reproductive disorders.",
-    reviews: [
-      { id: 1, user: "HopefulMother", rating: 5, comment: "Dr. Hana gave me hope when I was struggling with fertility issues.", date: "1 week ago" },
-      { id: 2, user: "Anonymous User", rating: 5, comment: "Extremely compassionate and thorough. Best doctor I've consulted.", date: "3 weeks ago" },
-      { id: 3, user: "NewMom2024", rating: 5, comment: "She guided me through my entire pregnancy journey.", date: "2 months ago" },
-    ]
-  },
-  {
-    id: 4,
-    name: "Dr. Meron Alemu",
-    specialty: "Mental Health",
-    avatar: "/doctors/meron.jpg",
-    rating: 4.7,
-    totalReviews: 89,
-    available: true,
-    responseTime: "Usually responds in 4 hours",
-    experience: "10 years",
-    bio: "Specializes in women's mental health, postpartum depression, and anxiety disorders.",
-    reviews: [
-      { id: 1, user: "Anonymous User", rating: 5, comment: "Finally someone who understands the mental load women carry.", date: "1 week ago" },
-      { id: 2, user: "StrongWoman", rating: 4, comment: "Helpful sessions, though I wish there were more follow-ups.", date: "1 month ago" },
-      { id: 3, user: "NewMomStruggles", rating: 5, comment: "Helped me through postpartum anxiety. Forever grateful.", date: "6 weeks ago" },
-    ]
-  },
-]
+function ChatRoomView({ 
+  chatRoom, 
+  onBack,
+  onOpenRating,
+  onClearHistory
+}: { 
+  chatRoom: ChatRoom
+  onBack: () => void
+  onOpenRating: () => void
+  onClearHistory: () => void
+}) {
+  const [message, setMessage] = useState("")
+  const [messages, setMessages] = useState(chatRoom.messages)
+  const [showClearDialog, setShowClearDialog] = useState(false)
+    const messagesEndRef = useRef<HTMLDivElement>(null)
+    const socketRef = useRef(null)
 
-const premiumFeatures = [
+    useEffect(() => {
+      // Connect and join premium room on mount
+      const socket = getSocket()
+      socket.connect()
+      socket.emit('joinPremium', chatRoom.id)
+      socket.on('premiumMessage', (data) => {
+        // Only add if for this chat
+        if (data.chatId === chatRoom.id) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: data._id || Date.now(),
+              sender: data.senderType === 'doctor' ? 'doctor' : 'user',
+              content: data.messageText,
+              time: new Date(data.createdAt).toLocaleTimeString() || 'Now',
+            },
+          ])
+        }
+      })
+      socketRef.current = socket
+      return () => {
+        socket.off('premiumMessage')
+        socket.disconnect()
+      }
+    }, [chatRoom.id])
+
+    const scrollToBottom = () => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    }
+
+    useEffect(() => {
+      scrollToBottom()
+    }, [messages])
+
+    const handleSend = async () => {
+      if (!message.trim()) return
+      const newMsg = {
+        chatId: chatRoom.id,
+        senderId: 'user', // Replace with actual userId if available
+        messageText: message.trim(),
+        senderType: 'user',
+      }
+      // Send via WebSocket
+      if (socketRef.current) {
+        socketRef.current.emit('premiumMessage', newMsg)
+      }
+      // Save to DB via chatApi
+      try {
+        await chatApi.sendMessage(newMsg)
+      } catch (e) {
+        // Optionally handle error
+      }
+      setMessage("")
+    }
+
+    const handleClearHistory = () => {
+      setMessages([])
+      onClearHistory()
+      setShowClearDialog(false)
+    }
+
+    return (
+      <div className="flex h-[calc(100vh-8rem)] flex-col">
+        {/* Chat Header */}
+        <div className="flex items-center gap-3 border-b border-border p-4">
+          <Button variant="ghost" size="sm" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <Avatar className="h-10 w-10">
+            <AvatarImage src={chatRoom.doctor.avatar} />
+            <AvatarFallback className="bg-secondary text-secondary-foreground">
+              {chatRoom.doctor.name.split(' ').map(n => n[0]).join('')}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1">
+            <h3 className="font-medium">{chatRoom.doctor.name}</h3>
+            <p className="text-xs text-muted-foreground">{chatRoom.doctor.specialty}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={onOpenRating} className="gap-1">
+              <Star className="h-3 w-3" />
+              Rate
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setShowClearDialog(true)}
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+            {/* ...existing code... */}
+            {/* Chat body and other JSX here */}
+            {/* ...existing code... */}
+      // Fetch message history on mount
+      useEffect(() => {
+        (async () => {
+          try {
+            const res = await chatApi.getMessages(chatRoom.id)
+            setMessages(
+              (res.data || []).map(msg => ({
+                id: msg._id,
+                sender: msg.senderType === 'doctor' ? 'doctor' : 'user',
+                content: msg.messageText,
+                time: new Date(msg.createdAt).toLocaleTimeString() || 'Now',
+              }))
+            )
+          } catch {}
+        })()
+      }, [chatRoom.id])
   "Direct private chat with certified doctors",
   "Priority responses within 24 hours",
   "Personalized health advice",
@@ -517,6 +552,7 @@ function ChatRoomView({
   onClearHistory: () => void
 }) {
   const [message, setMessage] = useState("")
+  const [sendError, setSendError] = useState("")
   const [messages, setMessages] = useState(chatRoom.messages)
   const [showClearDialog, setShowClearDialog] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -529,26 +565,28 @@ function ChatRoomView({
     scrollToBottom()
   }, [messages])
 
-  const handleSend = () => {
-    if (message.trim()) {
-      const newMessage = {
-        id: messages.length + 1,
-        sender: "user" as const,
-        content: message.trim(),
-        time: "Just now"
-      }
-      setMessages([...messages, newMessage])
-      setMessage("")
+  const handleSend = async () => {
+    setSendError("")
+    if (!message.trim()) return
+    const newMsg = {
+      chatId: chatRoom.id,
+      senderId: 'user', // Replace with actual userId if available
+      messageText: message.trim(),
+      senderType: 'user',
     }
+    // Send via WebSocket
+    if (socketRef.current) {
+      socketRef.current.emit('premiumMessage', newMsg)
+    }
+    // Save to DB via chatApi
+    try {
+      await chatApi.sendMessage(newMsg)
+    } catch (e) {
+      setSendError("Sorry, your message could not be sent. Please try again.")
+      return
+    }
+    setMessage("")
   }
-
-  const handleClearHistory = () => {
-    setMessages([])
-    onClearHistory()
-    setShowClearDialog(false)
-  }
-
-  return (
     <div className="flex h-[calc(100vh-8rem)] flex-col">
       {/* Chat Header */}
       <div className="flex items-center gap-3 border-b border-border p-4">
@@ -618,6 +656,9 @@ function ChatRoomView({
 
       {/* Input */}
       <div className="border-t border-border p-4">
+        {sendError && (
+          <div className="mb-2 text-sm text-destructive">{sendError}</div>
+        )}
         <div className="flex gap-2">
           <Input
             placeholder="Type your message..."

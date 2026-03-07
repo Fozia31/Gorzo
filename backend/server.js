@@ -1,4 +1,5 @@
 const express = require("express");
+const http = require("http");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const dotenv = require("dotenv");
@@ -17,6 +18,8 @@ const personalAssistanceRoutes = require("./routes/personalAssistanceRoutes");
 dotenv.config();
 
 const app = express();
+const server = http.createServer(app);
+const { initWebSocket } = require("./websocket");
 
 // Configure CORS to allow the frontend(s) used during development and production
 const allowedOrigins = [];
@@ -25,16 +28,16 @@ if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL);
 allowedOrigins.push("http://localhost:3000");
 
 app.use(
-	cors({
-		origin: (origin, callback) => {
-			// allow requests with no origin (e.g. mobile apps, curl)
-			if (!origin) return callback(null, true);
-			if (allowedOrigins.includes(origin)) {
-				return callback(null, true);
-			}
-			callback(new Error("CORS policy: origin not allowed"));
-		},
-	})
+       cors({
+           origin: (origin, callback) => {
+               // allow requests with no origin (e.g. mobile apps, curl)
+               if (!origin) return callback(null, true);
+               if (allowedOrigins.includes(origin)) {
+                   return callback(null, true);
+               }
+               callback(new Error("CORS policy: origin not allowed"));
+           },
+       })
 );
 app.use(express.json());
 
@@ -83,9 +86,11 @@ const startServer = async () => {
         await mongoose.connect(MONGO_URI);
         console.log("✅ MongoDB connected successfully to Her_Hackton");
 
-        app.listen(PORT, () => {
+        // Start HTTP server and WebSocket
+        server.listen(PORT, () => {
             console.log(`🚀 Server running on http://localhost:${PORT}`);
         });
+        initWebSocket(server);
     } catch (error) {
         console.error("❌ Failed to start server:", error.message);
         process.exit(1);

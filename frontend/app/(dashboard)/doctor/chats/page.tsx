@@ -1,6 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
+import { getSocket } from "@/lib/socket"
+import * as chatApi from "@/api/chatApi"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -59,33 +61,77 @@ const chatQueue = [
 
 function ChatView({ chat, onBack }: { chat: typeof chatQueue[0], onBack: () => void }) {
   const [message, setMessage] = useState("")
-  
-  // Sample messages
-  const messages = [
-    {
-      id: 1,
-      sender: "user",
-      content: "Hello Dr. Amara, I've been experiencing irregular cycles for the past 3 months.",
-      time: "Yesterday, 10:30 AM"
-    },
-    {
-      id: 2,
-      sender: "doctor",
-      content: "Hello! Thank you for reaching out. Irregular cycles can have various causes. Can you tell me more about your symptoms? Are you experiencing any pain, unusual discharge, or other changes?",
-      time: "Yesterday, 11:45 AM"
-    },
-    {
-      id: 3,
-      sender: "user",
-      content: "No pain, but I've noticed some weight changes and mood swings.",
-      time: "Yesterday, 2:00 PM"
-    },
-  ]
+  const [sendError, setSendError] = useState("")
+  const [messages, setMessages] = useState([])
+  const messagesEndRef = useRef(null)
+  const socketRef = useRef(null)
 
-  const handleSend = () => {
-    if (message.trim()) {
-      setMessage("")
+  useEffect(() => {
+    // Fetch message history
+    (async () => {
+      try {
+        const res = await chatApi.getMessages(chat.id)
+        setMessages(
+          (res.data || []).map(msg => ({
+            id: msg._id,
+            sender: msg.senderType === 'doctor' ? 'doctor' : 'user',
+            content: msg.messageText,
+            time: new Date(msg.createdAt).toLocaleTimeString() || 'Now',
+          }))
+        )
+      } catch {}
+    })()
+    const socket = getSocket()
+    socket.connect()
+    socket.emit('joinPremium', chat.id)
+    socket.on('premiumMessage', (data) => {
+      // Only add if for this chat
+      if (data.chatId === chat.id) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: data._id || Date.now(),
+            sender: data.senderType === 'doctor' ? 'doctor' : 'user',
+            content: data.messageText,
+            time: new Date(data.createdAt).toLocaleTimeString() || 'Now',
+          },
+        ])
+      }
+    })
+    socketRef.current = socket
+    return () => {
+      socket.off('premiumMessage')
+      socket.disconnect()
     }
+  }, [chat.id])
+
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
+    }
+  }, [messages])
+
+  const handleSend = async () => {
+    setSendError("")
+    if (!message.trim()) return
+    const newMsg = {
+      chatId: chat.id,
+      senderId: 'doctor', // Replace with actual doctorId if available
+      messageText: message.trim(),
+      senderType: 'doctor',
+    }
+    // Send via WebSocket
+    if (socketRef.current) {
+      socketRef.current.emit('premiumMessage', newMsg)
+    }
+    // Save to DB via chatApi
+    try {
+      await chatApi.sendMessage(newMsg)
+    } catch (e) {
+      setSendError("Sorry, your message could not be sent. Please try again.")
+      return
+    }
+    setMessage("")
   }
 
   return (
@@ -123,7 +169,7 @@ function ChatView({ chat, onBack }: { chat: typeof chatQueue[0], onBack: () => v
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((msg) => (
-          <div key={msg.id} className={cn("flex", msg.sender === "doctor" ? "justify-end" : "justify-start")}>
+          <div key={msg.id} className={cn("flex", msg.sender === "doctor" ? "justify-end" : "justify-start")}>...
             <div className={cn(
               "max-w-[80%] rounded-2xl px-4 py-2",
               msg.sender === "doctor" 
@@ -144,6 +190,9 @@ function ChatView({ chat, onBack }: { chat: typeof chatQueue[0], onBack: () => v
 
       {/* Input */}
       <div className="border-t border-border p-4">
+        {sendError && (
+          <div className="mb-2 text-sm text-destructive">{sendError}</div>
+        )}
         <div className="flex gap-2">
           <Input
             placeholder="Type your response..."
