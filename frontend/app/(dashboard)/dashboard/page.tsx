@@ -1,10 +1,12 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/lib/auth-context"
+import { getPosts } from "@/api/postApi"
+import { getDoctorAdvice } from "@/api/doctorAdviceApi"
 import { 
   Heart, 
   BookOpen, 
@@ -16,58 +18,87 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 
-// Sample knowledge hub articles
-const newArticles = [
-  {
-    id: 1,
-    title: "Understanding Your Hormonal Cycle",
-    author: "Dr. Amara",
-    category: "Hormones",
-    hasVoiceNote: true,
-    readTime: "5 min",
-  },
-  {
-    id: 2,
-    title: "Nutrition Tips for Each Phase of Your Cycle",
-    author: "Dr. Selam",
-    category: "Nutrition",
-    hasVoiceNote: true,
-    readTime: "8 min",
-  },
-  {
-    id: 3,
-    title: "Managing Stress and Its Impact on Fertility",
-    author: "Dr. Hana",
-    category: "Mental Health",
-    hasVoiceNote: false,
-    readTime: "6 min",
-  },
-]
+type DiscussionItem = {
+  id: string
+  title: string
+  replies: number
+  timeAgo: string
+}
 
-// Sample recent forum activity
-const recentForumActivity = [
-  {
-    id: 1,
-    title: "Natural remedies for menstrual cramps",
-    replies: 34,
-    timeAgo: "2h ago",
-  },
-  {
-    id: 2,
-    title: "PCOS diagnosis - feeling overwhelmed",
-    replies: 67,
-    timeAgo: "5h ago",
-  },
-  {
-    id: 3,
-    title: "How to talk to your partner about fertility",
-    replies: 28,
-    timeAgo: "1d ago",
-  },
-]
+type KnowledgeItem = {
+  id: string
+  title: string
+  author: string
+  category: string
+  hasVoiceNote: boolean
+  readTime: string
+}
+
+const toRelativeTime = (dateValue: string | number | Date | undefined) => {
+  if (!dateValue) return "N/A"
+  const date = new Date(dateValue)
+  const diffMs = Date.now() - date.getTime()
+  const minutes = Math.floor(diffMs / (1000 * 60))
+  if (minutes < 1) return "just now"
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
 
 export default function DashboardPage() {
   const { user } = useAuth()
+  const [activeDiscussions, setActiveDiscussions] = useState<DiscussionItem[]>([])
+  const [knowledgeItems, setKnowledgeItems] = useState<KnowledgeItem[]>([])
+
+  useEffect(() => {
+    const loadHomeData = async () => {
+      try {
+        const [posts, articles] = await Promise.all([
+          getPosts({ limit: 20 }),
+          getDoctorAdvice({ status: "published" }),
+        ])
+
+        const mappedDiscussions: DiscussionItem[] = Array.isArray(posts)
+          ? [...posts]
+              .sort((a: any, b: any) => Number(b.likes || 0) - Number(a.likes || 0))
+              .slice(0, 3)
+              .map((post: any) => ({
+                id: String(post._id),
+                title: String(post.title || "Untitled discussion"),
+                replies: Number(post.likes || 0),
+                timeAgo: toRelativeTime(post.createdAt),
+              }))
+          : []
+
+        const mappedKnowledge: KnowledgeItem[] = Array.isArray(articles)
+          ? articles.slice(0, 3).map((item: any) => {
+              const textContent = String(item?.textContent || "")
+              const words = textContent.trim() ? textContent.trim().split(/\s+/).length : 0
+              const readMinutes = Math.max(1, Math.ceil(words / 200))
+
+              return {
+                id: String(item?._id || ""),
+                title: String(item?.title || "Untitled article"),
+                author: String(item?.doctorId?.userId?.displayName || "Doctor"),
+                category: String(item?.category || "Wellness"),
+                hasVoiceNote: Boolean(item?.voiceUrl),
+                readTime: `${readMinutes} min`,
+              }
+            })
+          : []
+
+        setActiveDiscussions(mappedDiscussions)
+        setKnowledgeItems(mappedKnowledge)
+      } catch {
+        setActiveDiscussions([])
+        setKnowledgeItems([])
+      }
+    }
+
+    void loadHomeData()
+  }, [])
 
   // If you need to refresh the user from the backend you could call an
   // endpoint like `/api/users/:id` here using the `user?.id` value. That
@@ -92,7 +123,7 @@ export default function DashboardPage() {
 
       {/* Premium Banner for Free Users */}
       {user?.tier === "free" && (
-        <Card className="overflow-hidden border-primary/30 bg-gradient-to-r from-primary/10 via-primary/5 to-secondary/10">
+        <Card className="overflow-hidden border-primary/30 bg-linear-to-r from-primary/10 via-primary/5 to-secondary/10">
           <CardContent className="flex items-center gap-4 p-4">
             <div className="rounded-full bg-primary/20 p-3">
               <Crown className="h-6 w-6 text-primary" />
@@ -120,7 +151,7 @@ export default function DashboardPage() {
               <div className="mb-2 rounded-full bg-primary/10 p-3 transition-colors group-hover:bg-primary/20">
                 <Heart className="h-5 w-5 text-primary" />
               </div>
-              <span className="text-sm font-medium text-center text-xs">Discuss with Sisters</span>
+              <span className="text-xs font-medium text-center">Discuss with Sisters</span>
             </CardContent>
           </Card>
         </Link>
@@ -171,7 +202,7 @@ export default function DashboardPage() {
           </Link>
         </CardHeader>
         <CardContent className="space-y-3">
-          {recentForumActivity.map((topic) => (
+          {activeDiscussions.map((topic) => (
             <Link key={topic.id} href="/dashboard/forum">
               <div className="group flex items-center justify-between rounded-lg p-3 transition-colors hover:bg-muted/50">
                 <div className="flex items-center gap-3">
@@ -183,7 +214,7 @@ export default function DashboardPage() {
                       {topic.title}
                     </h3>
                     <p className="text-xs text-muted-foreground">
-                      {topic.replies} replies • {topic.timeAgo}
+                      {topic.replies} likes • {topic.timeAgo}
                     </p>
                   </div>
                 </div>
@@ -191,6 +222,9 @@ export default function DashboardPage() {
               </div>
             </Link>
           ))}
+          {activeDiscussions.length === 0 && (
+            <p className="px-2 py-1 text-sm text-muted-foreground">No active discussions yet.</p>
+          )}
         </CardContent>
       </Card>
 
@@ -209,8 +243,8 @@ export default function DashboardPage() {
           </Link>
         </CardHeader>
         <CardContent className="space-y-3">
-          {newArticles.map((article) => (
-            <Link key={article.id} href={`/dashboard/knowledge/${article.id}`}>
+          {knowledgeItems.map((article) => (
+            <Link key={article.id} href="/dashboard/knowledge">
               <div className="group flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-muted/50">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                   <BookOpen className="h-5 w-5 text-primary" />
@@ -236,6 +270,9 @@ export default function DashboardPage() {
               </div>
             </Link>
           ))}
+          {knowledgeItems.length === 0 && (
+            <p className="px-2 py-1 text-sm text-muted-foreground">No knowledge articles available yet.</p>
+          )}
         </CardContent>
       </Card>
     </div>

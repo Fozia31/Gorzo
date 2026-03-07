@@ -24,10 +24,16 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useAuth } from "@/lib/auth-context"
-import { getDoctorAdviceByDoctor } from "@/api/doctorAdviceApi"
+import {
+  deleteDoctorAdvice,
+  getDoctorAdviceByDoctor,
+  getDoctorAdviceById,
+  updateDoctorAdvice,
+  uploadDoctorAdviceAudio,
+} from "@/api/doctorAdviceApi"
 import { getDoctorByUserId, getDoctorPatients } from "@/api/doctorApi"
-import { getOrCreateDoctorChat } from "@/api/chatApi"
-import { deleteMessageById, sendMessage } from "@/api/messageApi"
+import { getChats, getOrCreateDoctorChat } from "@/api/chatApi"
+import { deleteMessageById, getMessagesByChat, sendMessage } from "@/api/messageApi"
 import { 
   Mic,
   MicOff,
@@ -44,6 +50,7 @@ import {
   BookOpen,
   Calendar,
   CheckCircle2,
+  Pencil,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -52,63 +59,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-
-// Sample voice notes
-const sampleVoiceNotes = [
-  {
-    id: 1,
-    title: "Understanding Your Cycle",
-    duration: "3:45",
-    createdAt: "2 hours ago",
-    type: "article",
-    articleTitle: "Menstrual Health 101",
-    plays: 156,
-  },
-  {
-    id: 2,
-    title: "Response to Selam123",
-    duration: "1:20",
-    createdAt: "Yesterday",
-    type: "patient",
-    patientName: "Selam123",
-    status: "sent",
-  },
-  {
-    id: 3,
-    title: "Nutrition Tips for Fertility",
-    duration: "5:12",
-    createdAt: "3 days ago",
-    type: "article",
-    articleTitle: "Fertility & Nutrition Guide",
-    plays: 89,
-  },
-  {
-    id: 4,
-    title: "Follow-up for HopefulMama",
-    duration: "2:30",
-    createdAt: "1 week ago",
-    type: "patient",
-    patientName: "HopefulMama",
-    status: "played",
-  },
-  {
-    id: 5,
-    title: "Hormonal Balance Explanation",
-    duration: "4:05",
-    createdAt: "1 week ago",
-    type: "article",
-    articleTitle: "Hormonal Health Guide",
-    plays: 234,
-  },
-]
-
-// Sample patients for sending voice notes
-const patients = [
-  { id: 1, username: "Selam123", avatar: "S1" },
-  { id: 2, username: "HopefulMama", avatar: "HM" },
-  { id: 3, username: "BloomingFlower", avatar: "BF" },
-  { id: 4, username: "WellnessJourney", avatar: "WJ" },
-]
 
 type VoiceNoteItem = {
   id: string | number
@@ -121,43 +71,58 @@ type VoiceNoteItem = {
   patientName?: string
   status?: string
   plays?: number
+  audioUrl?: string
+  category?: string
+  textContent?: string
 }
 
-const sampleVoiceNotesTyped: VoiceNoteItem[] = sampleVoiceNotes.map((note) => ({
-  ...note,
-  type: note.type === "article" ? "article" : "patient",
-}))
+type PatientOption = {
+  id: string
+  username: string
+  avatar: string
+}
+
+const buildPatientAvatar = (username: string) =>
+  username
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase() || "P"
 
 export default function VoiceNotesPage() {
-  const { user, login } = useAuth()
+  const { user } = useAuth()
   const userId = user?.id
   const [doctorRecordId, setDoctorRecordId] = useState<string>("")
-  const [voiceNotes, setVoiceNotes] = useState<VoiceNoteItem[]>(sampleVoiceNotesTyped)
-  const [patientOptions, setPatientOptions] = useState(patients)
+  const [voiceNotes, setVoiceNotes] = useState<VoiceNoteItem[]>([])
+  const [patientOptions, setPatientOptions] = useState<PatientOption[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [filterType, setFilterType] = useState<string>("all")
   const [isRecording, setIsRecording] = useState(false)
+  const [isUploadingAudio, setIsUploadingAudio] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
   const [hasRecording, setHasRecording] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [playingId, setPlayingId] = useState<string | number | null>(null)
+  const [playingUrl, setPlayingUrl] = useState<string>("")
   const [newNoteTitle, setNewNoteTitle] = useState("")
   const [selectedPatient, setSelectedPatient] = useState("")
   const [sendDialogOpen, setSendDialogOpen] = useState(false)
+  const [recordedAudio, setRecordedAudio] = useState<{ url: string; durationSec: number } | null>(null)
+  const [isEditArticleDialogOpen, setIsEditArticleDialogOpen] = useState(false)
+  const [editingArticleId, setEditingArticleId] = useState<string>("")
+  const [isSavingArticleEdit, setIsSavingArticleEdit] = useState(false)
+  const [editArticleData, setEditArticleData] = useState({
+    title: "",
+    category: "Hormones",
+    content: "",
+  })
   const timerRef = useRef<NodeJS.Timeout | null>(null)
-
-  // Auto-login for demo
-  useEffect(() => {
-    if (!user) {
-      login({
-        id: "2",
-        username: "Dr. Amara",
-        email: "doctor@efoy.com",
-        role: "doctor",
-        tier: "premium",
-      })
-    }
-  }, [user, login])
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const recordedChunksRef = useRef<Blob[]>([])
+  const recordingStreamRef = useRef<MediaStream | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
     const loadDoctorRecordId = async () => {
@@ -178,71 +143,124 @@ export default function VoiceNotesPage() {
       if (!doctorRecordId) return
 
       try {
-        const [adviceItems, patientResponse] = await Promise.all([
+        const [adviceItems, patientResponse, chats] = await Promise.all([
           getDoctorAdviceByDoctor(doctorRecordId, { status: "published" }),
           getDoctorPatients(doctorRecordId, { limit: 100 }),
+          getChats({ doctorId: doctorRecordId, sessionStatus: "Active" }),
         ])
 
-        if (Array.isArray(adviceItems)) {
-          const articleVoiceNotes = adviceItems
-            .filter((item: any) => Boolean(item.voiceUrl))
-            .map((item: any) => ({
-              id: item._id,
-              backendId: item._id,
-              title: item.title,
-              duration: item.audioDuration ? formatTime(item.audioDuration) : "0:00",
-              createdAt: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "N/A",
-              type: "article" as const,
-              articleTitle: item.title,
-              plays: Number(item.viewsCount || 0),
-            }))
+        const articleVoiceNotes: VoiceNoteItem[] = Array.isArray(adviceItems)
+          ? adviceItems
+              .map((item: any) => ({
+                id: item._id,
+                backendId: item._id,
+                title: item.title,
+          duration: item.audioDuration ? formatTime(item.audioDuration) : "-",
+                createdAt: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "N/A",
+                type: "article" as const,
+                articleTitle: item.title,
+                plays: Number(item.viewsCount || 0),
+                audioUrl: String(item.voiceUrl || ""),
+                category: String(item.category || "Hormones"),
+                textContent: String(item.textContent || ""),
+              }))
+          : []
 
-          setVoiceNotes((prev) => {
-            const patientNotes = prev.filter((note: any) => note.type === "patient")
-            return [...patientNotes, ...articleVoiceNotes]
+        const chatsList = Array.isArray(chats) ? chats : []
+        const patientVoiceResults = await Promise.all(
+          chatsList.map(async (chat: any) => {
+            try {
+              const response = await getMessagesByChat(chat._id, { limit: 200 })
+              const messages = Array.isArray(response?.data) ? response.data : []
+              const patientName =
+                chat?.userId?.displayName ||
+                chat?.userId?.username ||
+                "Patient"
+
+              return messages
+                .filter((msg: any) => msg.messageType === "voice" && msg.senderRole === "Doctor" && msg.voiceUrl)
+                .map((msg: any) => ({
+                  id: msg._id,
+                  backendId: msg._id,
+                  title: msg.messageText || `Insight to ${patientName}`,
+                  duration: formatTime(Number(msg.durationSec || 0)),
+                  createdAt: msg.createdAt ? new Date(msg.createdAt).toLocaleDateString() : "N/A",
+                  type: "patient" as const,
+                  patientName,
+                  status: msg.isRead ? "played" : "sent",
+                  audioUrl: String(msg.voiceUrl || ""),
+                }))
+            } catch {
+              return [] as VoiceNoteItem[]
+            }
           })
-        }
+        )
 
-        if (Array.isArray(patientResponse?.data)) {
-          setPatientOptions(
-            patientResponse.data.map((item: any) => ({
-              id: item.id,
-              username: item.username,
-              avatar: item.username
-                .split(" ")
-                .filter(Boolean)
-                .slice(0, 2)
-                .map((part: string) => part[0])
-                .join("")
-                .toUpperCase(),
-            }))
-          )
-        }
+        const patientVoiceNotes = patientVoiceResults.flat()
+        setVoiceNotes([...patientVoiceNotes, ...articleVoiceNotes])
+
+        const optionsFromPatientsApi: PatientOption[] = Array.isArray(patientResponse?.data)
+          ? patientResponse.data
+              .map((item: any) => {
+                const id = String(item?.id || "")
+                const username = String(item?.username || "").trim()
+                if (!id || !username) return null
+                return {
+                  id,
+                  username,
+                  avatar: buildPatientAvatar(username),
+                }
+              })
+              .filter(Boolean) as PatientOption[]
+          : []
+
+        const optionsFromChats: PatientOption[] = chatsList
+          .map((chat: any) => {
+            const id = String(chat?.userId?._id || "")
+            const username = String(chat?.userId?.displayName || chat?.userId?.username || "").trim()
+            if (!id || !username) return null
+            return {
+              id,
+              username,
+              avatar: buildPatientAvatar(username),
+            }
+          })
+          .filter(Boolean) as PatientOption[]
+
+        const merged = [...optionsFromPatientsApi, ...optionsFromChats]
+        const uniqueById = Array.from(new Map(merged.map((item) => [item.id, item])).values())
+        setPatientOptions(uniqueById)
       } catch {
-        // Keep sample data when API fails.
+        setPatientOptions([])
       }
     }
 
     void loadVoiceData()
   }, [doctorRecordId])
 
-  // Recording timer
   useEffect(() => {
-    if (isRecording) {
-      timerRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1)
-      }, 1000)
-    } else {
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-      }
-    }
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
+      if (timerRef.current) clearInterval(timerRef.current)
+      if (recordingStreamRef.current) {
+        recordingStreamRef.current.getTracks().forEach((track) => track.stop())
       }
     }
-  }, [isRecording])
+  }, [])
+
+  useEffect(() => {
+    if (!audioRef.current) return
+
+    if (!isPlaying || !playingUrl) {
+      audioRef.current.pause()
+      return
+    }
+
+    audioRef.current.src = playingUrl
+    void audioRef.current.play().catch(() => {
+      setIsPlaying(false)
+      setPlayingId(null)
+    })
+  }, [isPlaying, playingUrl])
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -250,67 +268,133 @@ export default function VoiceNotesPage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  const startRecording = () => {
-    setIsRecording(true)
-    setRecordingTime(0)
-    setHasRecording(false)
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      recordingStreamRef.current = stream
+      recordedChunksRef.current = []
+      const recorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = recorder
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          recordedChunksRef.current.push(event.data)
+        }
+      }
+
+      recorder.start()
+      setRecordedAudio(null)
+      setHasRecording(false)
+      setRecordingTime(0)
+      setIsRecording(true)
+      timerRef.current = setInterval(() => {
+        setRecordingTime((prev) => prev + 1)
+      }, 1000)
+    } catch {
+      alert("Microphone access denied or unavailable.")
+    }
   }
 
   const stopRecording = () => {
+    const recorder = mediaRecorderRef.current
+    if (!recorder) return
+
     setIsRecording(false)
-    setHasRecording(true)
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+
+    recorder.onstop = async () => {
+      try {
+        const blob = new Blob(recordedChunksRef.current, { type: recorder.mimeType || "audio/webm" })
+        if (!blob.size) throw new Error("Empty recording")
+
+        setIsUploadingAudio(true)
+        const extension = recorder.mimeType.includes("webm") ? "webm" : "wav"
+        const file = new window.File([blob], `voice-note-${Date.now()}.${extension}`, {
+          type: recorder.mimeType || "audio/webm",
+        })
+        const uploaded = await uploadDoctorAdviceAudio(file)
+
+        setRecordedAudio({
+          url: String(uploaded?.url || ""),
+          durationSec: recordingTime,
+        })
+        setHasRecording(true)
+      } catch {
+        alert("Failed to upload recording. Please try again.")
+        setHasRecording(false)
+      } finally {
+        setIsUploadingAudio(false)
+        mediaRecorderRef.current = null
+        recordedChunksRef.current = []
+        if (recordingStreamRef.current) {
+          recordingStreamRef.current.getTracks().forEach((track) => track.stop())
+          recordingStreamRef.current = null
+        }
+      }
+    }
+
+    recorder.stop()
   }
 
   const deleteRecording = () => {
     setHasRecording(false)
     setRecordingTime(0)
+    setRecordedAudio(null)
   }
 
-  const togglePlayback = (id?: string | number) => {
-    if (id !== undefined) {
-      if (playingId === id) {
-        setIsPlaying(!isPlaying)
-      } else {
-        setPlayingId(id)
-        setIsPlaying(true)
-      }
-    } else {
-      setIsPlaying(!isPlaying)
+  const togglePlayback = (id: string | number, audioUrl?: string) => {
+    if (!audioUrl) return
+    if (playingId === id && isPlaying) {
+      setIsPlaying(false)
+      return
     }
+    setPlayingId(id)
+    setPlayingUrl(audioUrl)
+    setIsPlaying(true)
   }
 
   const handleSendVoiceNote = () => {
-    if (!hasRecording || !newNoteTitle || !selectedPatient || !doctorRecordId || !userId) return
+    if (!hasRecording || !newNoteTitle || !selectedPatient || !doctorRecordId || !userId || !recordedAudio?.url) return
 
     const submit = async () => {
-      const patient = patientOptions.find((p) => p.id.toString() === selectedPatient)
-      const chat = await getOrCreateDoctorChat({ doctorId: doctorRecordId, userId: selectedPatient })
-      const sent = await sendMessage({
-        chatId: chat._id,
-        senderId: userId,
-        senderRole: "Doctor",
-        messageType: "voice",
-        voiceUrl: "local://voice-note",
-        durationSec: recordingTime,
-      })
+      try {
+        const patient = patientOptions.find((p) => p.id.toString() === selectedPatient)
+        const chat = await getOrCreateDoctorChat({ doctorId: doctorRecordId, userId: selectedPatient })
+        const sent = await sendMessage({
+          chatId: chat._id,
+          senderId: userId,
+          senderRole: "Doctor",
+          messageType: "voice",
+          voiceUrl: recordedAudio.url,
+          durationSec: recordedAudio.durationSec,
+          messageText: newNoteTitle,
+        })
 
-      const newNote = {
-        id: sent?._id || voiceNotes.length + 1,
-        backendId: sent?._id,
-        title: newNoteTitle,
-        duration: formatTime(recordingTime),
-        createdAt: "Just now",
-        type: "patient" as const,
-        patientName: patient?.username || "Unknown",
-        status: "sent" as const,
+        const newNote = {
+          id: sent?._id || voiceNotes.length + 1,
+          backendId: sent?._id,
+          title: newNoteTitle,
+          duration: formatTime(recordedAudio.durationSec),
+          createdAt: "Just now",
+          type: "patient" as const,
+          patientName: patient?.username || "Unknown",
+          status: "sent" as const,
+          audioUrl: String(sent?.voiceUrl || recordedAudio.url),
+        }
+
+        setVoiceNotes([newNote, ...voiceNotes])
+        setHasRecording(false)
+        setRecordingTime(0)
+        setRecordedAudio(null)
+        setNewNoteTitle("")
+        setSelectedPatient("")
+        setSendDialogOpen(false)
+      } catch {
+        alert("Failed to send insight. Please try again.")
       }
-
-      setVoiceNotes([newNote, ...voiceNotes])
-      setHasRecording(false)
-      setRecordingTime(0)
-      setNewNoteTitle("")
-      setSelectedPatient("")
-      setSendDialogOpen(false)
     }
 
     void submit()
@@ -318,14 +402,84 @@ export default function VoiceNotesPage() {
 
   const deleteVoiceNote = (id: number | string) => {
     const remove = async () => {
-      const note = voiceNotes.find((item) => item.id === id)
-      if (note?.backendId && note.type === "patient") {
-        await deleteMessageById(note.backendId)
+      try {
+        const note = voiceNotes.find((item) => item.id === id)
+        if (note?.backendId && note.type === "patient") {
+          await deleteMessageById(note.backendId)
+        }
+        if (note?.backendId && note.type === "article") {
+          await deleteDoctorAdvice(note.backendId)
+        }
+        setVoiceNotes((prev) => prev.filter((item) => item.id !== id))
+      } catch {
+        alert("Failed to delete insight.")
       }
-      setVoiceNotes(voiceNotes.filter((item) => item.id !== id))
     }
 
     void remove()
+  }
+
+  const handleOpenEditArticle = async (note: VoiceNoteItem) => {
+    if (note.type !== "article" || !note.backendId) return
+
+    setEditingArticleId(note.backendId)
+    setEditArticleData({
+      title: note.title || "",
+      category: note.category || "Hormones",
+      content: note.textContent || "",
+    })
+    setIsEditArticleDialogOpen(true)
+
+    try {
+      const details = await getDoctorAdviceById(note.backendId)
+      setEditArticleData({
+        title: details?.title || note.title || "",
+        category: details?.category || note.category || "Hormones",
+        content: details?.textContent || note.textContent || "",
+      })
+    } catch {
+      // Keep optimistic values if fetch fails.
+    }
+  }
+
+  const handleSaveArticleEdit = async () => {
+    if (!editingArticleId) return
+    const trimmedTitle = editArticleData.title.trim()
+    if (!trimmedTitle) {
+      alert("Title is required.")
+      return
+    }
+
+    setIsSavingArticleEdit(true)
+    try {
+      const updated = await updateDoctorAdvice(editingArticleId, {
+        title: trimmedTitle,
+        category: editArticleData.category,
+        textContent: editArticleData.content,
+      })
+
+      setVoiceNotes((prev) =>
+        prev.map((item) =>
+          item.backendId === editingArticleId
+            ? {
+                ...item,
+                title: updated?.title || trimmedTitle,
+                articleTitle: updated?.title || trimmedTitle,
+                category: updated?.category || editArticleData.category,
+                textContent: updated?.textContent || editArticleData.content,
+              }
+            : item
+        )
+      )
+
+      setIsEditArticleDialogOpen(false)
+      setEditingArticleId("")
+      alert("Article updated successfully!")
+    } catch {
+      alert("Failed to update article.")
+    } finally {
+      setIsSavingArticleEdit(false)
+    }
   }
 
   const filteredNotes = voiceNotes.filter(note => {
@@ -343,15 +497,15 @@ export default function VoiceNotesPage() {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="font-serif text-2xl font-semibold text-foreground md:text-3xl">
-            Voice Notes
+            Insights
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Record and manage voice notes for patients and articles
+            Record and manage insights for patients and articles
           </p>
         </div>
         <Button onClick={() => setSendDialogOpen(true)} className="gap-2">
           <Mic className="h-4 w-4" />
-          New Voice Note
+          New Insight
         </Button>
       </div>
 
@@ -410,7 +564,7 @@ export default function VoiceNotesPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search voice notes..."
+            placeholder="Search insights..."
             className="pl-10"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -428,7 +582,7 @@ export default function VoiceNotesPage() {
         </Select>
       </div>
 
-      {/* Voice Notes List */}
+      {/* Insights List */}
       <Tabs defaultValue="all" className="w-full">
         <TabsList className="grid w-full max-w-md grid-cols-3">
           <TabsTrigger value="all">All ({voiceNotes.length})</TabsTrigger>
@@ -442,7 +596,7 @@ export default function VoiceNotesPage() {
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Mic className="h-12 w-12 text-muted-foreground/50" />
                 <p className="mt-4 text-center text-muted-foreground">
-                  No voice notes found
+                  No insights found
                 </p>
                 <Button variant="outline" className="mt-4 gap-2" onClick={() => setSendDialogOpen(true)}>
                   <Mic className="h-4 w-4" />
@@ -456,7 +610,9 @@ export default function VoiceNotesPage() {
                 key={note.id}
                 note={note}
                 isPlaying={playingId === note.id && isPlaying}
-                onPlayToggle={() => togglePlayback(note.id)}
+                onPlayToggle={() => togglePlayback(note.id, note.audioUrl)}
+                onEdit={() => handleOpenEditArticle(note)}
+                onDownload={() => note.audioUrl && window.open(note.audioUrl, "_blank")}
                 onDelete={() => deleteVoiceNote(note.id)}
               />
             ))
@@ -469,7 +625,7 @@ export default function VoiceNotesPage() {
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <BookOpen className="h-12 w-12 text-muted-foreground/50" />
                 <p className="mt-4 text-center text-muted-foreground">
-                  No article voice notes yet
+                  No article insights yet
                 </p>
               </CardContent>
             </Card>
@@ -479,7 +635,9 @@ export default function VoiceNotesPage() {
                 key={note.id}
                 note={note}
                 isPlaying={playingId === note.id && isPlaying}
-                onPlayToggle={() => togglePlayback(note.id)}
+                onPlayToggle={() => togglePlayback(note.id, note.audioUrl)}
+                onEdit={() => handleOpenEditArticle(note)}
+                onDownload={() => note.audioUrl && window.open(note.audioUrl, "_blank")}
                 onDelete={() => deleteVoiceNote(note.id)}
               />
             ))
@@ -492,7 +650,7 @@ export default function VoiceNotesPage() {
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Users className="h-12 w-12 text-muted-foreground/50" />
                 <p className="mt-4 text-center text-muted-foreground">
-                  No patient voice notes yet
+                  No patient insights yet
                 </p>
               </CardContent>
             </Card>
@@ -502,7 +660,9 @@ export default function VoiceNotesPage() {
                 key={note.id}
                 note={note}
                 isPlaying={playingId === note.id && isPlaying}
-                onPlayToggle={() => togglePlayback(note.id)}
+                onPlayToggle={() => togglePlayback(note.id, note.audioUrl)}
+                onEdit={() => handleOpenEditArticle(note)}
+                onDownload={() => note.audioUrl && window.open(note.audioUrl, "_blank")}
                 onDelete={() => deleteVoiceNote(note.id)}
               />
             ))
@@ -510,13 +670,13 @@ export default function VoiceNotesPage() {
         </TabsContent>
       </Tabs>
 
-      {/* New Voice Note Dialog */}
+      {/* New Insight Dialog */}
       <Dialog open={sendDialogOpen} onOpenChange={setSendDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>New Voice Note</DialogTitle>
+            <DialogTitle>New Insight</DialogTitle>
             <DialogDescription>
-              Record a voice note to send to a patient
+              Record an insight to send to a patient
             </DialogDescription>
           </DialogHeader>
 
@@ -540,6 +700,9 @@ export default function VoiceNotesPage() {
                   <p className="text-2xl font-mono font-medium">
                     {formatTime(recordingTime)}
                   </p>
+                  {isUploadingAudio && (
+                    <p className="text-xs text-muted-foreground">Uploading audio...</p>
+                  )}
                   <div className="flex gap-2">
                     {isRecording ? (
                       <Button 
@@ -576,10 +739,10 @@ export default function VoiceNotesPage() {
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      onClick={() => togglePlayback()}
+                      onClick={() => togglePlayback("preview", recordedAudio?.url)}
                       className="gap-2"
                     >
-                      {isPlaying && playingId === null ? (
+                      {isPlaying && playingId === "preview" ? (
                         <PauseCircle className="h-4 w-4" />
                       ) : (
                         <PlayCircle className="h-4 w-4" />
@@ -619,6 +782,11 @@ export default function VoiceNotesPage() {
                       <SelectValue placeholder="Select a patient" />
                     </SelectTrigger>
                     <SelectContent>
+                      {patientOptions.length === 0 ? (
+                        <SelectItem value="__no_patient__" disabled>
+                          No patients found
+                        </SelectItem>
+                      ) : null}
                       {patientOptions.map((patient) => (
                         <SelectItem key={patient.id} value={patient.id.toString()}>
                           <div className="flex items-center gap-2">
@@ -643,6 +811,7 @@ export default function VoiceNotesPage() {
               setSendDialogOpen(false)
               setHasRecording(false)
               setRecordingTime(0)
+              setRecordedAudio(null)
               setNewNoteTitle("")
               setSelectedPatient("")
             }}>
@@ -650,11 +819,80 @@ export default function VoiceNotesPage() {
             </Button>
             <Button 
               onClick={handleSendVoiceNote}
-              disabled={!hasRecording || !newNoteTitle || !selectedPatient}
+              disabled={!hasRecording || !newNoteTitle || !selectedPatient || isUploadingAudio || patientOptions.length === 0}
               className="gap-2"
             >
               <Send className="h-4 w-4" />
-              Send Voice Note
+              Send Insight
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <audio
+        ref={audioRef}
+        onEnded={() => {
+          setIsPlaying(false)
+          setPlayingId(null)
+        }}
+        className="hidden"
+      />
+
+      <Dialog open={isEditArticleDialogOpen} onOpenChange={setIsEditArticleDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Article</DialogTitle>
+            <DialogDescription>
+              Update the article linked to this insight.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="edit-voice-article-title">Title</Label>
+              <Input
+                id="edit-voice-article-title"
+                value={editArticleData.title}
+                onChange={(e) => setEditArticleData((prev) => ({ ...prev, title: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-voice-article-category">Category</Label>
+              <Select
+                value={editArticleData.category}
+                onValueChange={(value) => setEditArticleData((prev) => ({ ...prev, category: value }))}
+              >
+                <SelectTrigger id="edit-voice-article-category">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Hormones">Hormones</SelectItem>
+                  <SelectItem value="Nutrition">Nutrition</SelectItem>
+                  <SelectItem value="Fertility">Fertility</SelectItem>
+                  <SelectItem value="Conditions">Conditions</SelectItem>
+                  <SelectItem value="Wellness">Wellness</SelectItem>
+                  <SelectItem value="Mental Health">Mental Health</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-voice-article-content">Content</Label>
+              <Input
+                id="edit-voice-article-content"
+                value={editArticleData.content}
+                onChange={(e) => setEditArticleData((prev) => ({ ...prev, content: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditArticleDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveArticleEdit} disabled={isSavingArticleEdit}>
+              {isSavingArticleEdit ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -663,18 +901,24 @@ export default function VoiceNotesPage() {
   )
 }
 
-// Voice Note Card Component
+// Insight Card Component
 function VoiceNoteCard({ 
   note, 
   isPlaying, 
   onPlayToggle, 
+  onEdit,
+  onDownload,
   onDelete 
 }: { 
   note: VoiceNoteItem
   isPlaying: boolean
   onPlayToggle: () => void
+  onEdit: () => void
+  onDownload: () => void
   onDelete: () => void
 }) {
+  const hasAudio = Boolean(note.audioUrl)
+
   return (
     <Card className="transition-shadow hover:shadow-md">
       <CardContent className="flex items-center gap-4 p-4">
@@ -687,6 +931,7 @@ function VoiceNoteCard({
             isPlaying ? "bg-primary/10 text-primary" : "bg-muted"
           )}
           onClick={onPlayToggle}
+          disabled={!hasAudio}
         >
           {isPlaying ? (
             <PauseCircle className="h-6 w-6" />
@@ -727,7 +972,7 @@ function VoiceNoteCard({
           </div>
           {note.type === "article" && note.articleTitle && (
             <p className="mt-1 text-xs text-muted-foreground">
-              Attached to: {note.articleTitle}
+              {hasAudio ? `Attached to: ${note.articleTitle}` : `No insight yet: ${note.articleTitle}`}
             </p>
           )}
         </div>
@@ -740,7 +985,13 @@ function VoiceNoteCard({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem className="gap-2">
+            {note.type === "article" && (
+              <DropdownMenuItem className="gap-2" onClick={onEdit}>
+                <Pencil className="h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem className="gap-2" onClick={onDownload} disabled={!hasAudio}>
               <Download className="h-4 w-4" />
               Download
             </DropdownMenuItem>

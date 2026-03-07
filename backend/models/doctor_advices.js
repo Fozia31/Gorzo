@@ -2,6 +2,13 @@ const mongoose = require("mongoose");
 
 const doctorAdviceSchema = new mongoose.Schema(
 	{
+		advice_id: {
+			type: String,
+			trim: true,
+			unique: true,
+			index: true,
+			default: () => `ADV-${new mongoose.Types.ObjectId().toString()}`,
+		},
 		doctorId: {
 			type: mongoose.Schema.Types.ObjectId,
 			ref: "Doctor",
@@ -64,6 +71,17 @@ const doctorAdviceSchema = new mongoose.Schema(
 			type: Number,
 			min: 0,
 			default: 0,
+		},
+		attachments: {
+			type: [
+				{
+					name: { type: String, trim: true, required: true },
+					url: { type: String, trim: true, required: true },
+					mimeType: { type: String, trim: true, default: "application/octet-stream" },
+					size: { type: Number, min: 0, default: 0 },
+				},
+			],
+			default: [],
 		},
 	},
 	{

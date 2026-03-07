@@ -15,108 +15,109 @@ import {
   Mic, 
   Clock,
   User,
-  Headphones
+  Headphones,
+  Paperclip,
+  Download
 } from "lucide-react"
+import { getDoctorAdvice } from "@/api/doctorAdviceApi"
 
-// Sample articles
-const articles = [
-  {
-    id: 1,
-    title: "Understanding Your Hormonal Cycle: A Complete Guide",
-    author: {
-      name: "Dr. Amara Bekele",
-      specialty: "Gynecologist",
-      avatar: "/doctors/amara.jpg"
-    },
-    content: "Your menstrual cycle is controlled by a complex interplay of hormones. Understanding these changes can help you better manage your health and wellbeing throughout the month...",
-    category: "Hormones",
-    readTime: "8 min",
-    hasVoiceNote: true,
-    voiceDuration: "4:32",
-    audioUrl: "/audio/hormonal-cycle.mp3",
-    publishedAt: "2 days ago",
-    featured: true,
-  },
-  {
-    id: 2,
-    title: "Nutrition Tips for Each Phase of Your Cycle",
-    author: {
-      name: "Dr. Selam Haile",
-      specialty: "Nutritionist",
-      avatar: "/doctors/selam.jpg"
-    },
-    content: "What you eat can significantly impact how you feel during different phases of your menstrual cycle. During the follicular phase, focus on iron-rich foods...",
-    category: "Nutrition",
-    readTime: "6 min",
-    hasVoiceNote: true,
-    voiceDuration: "3:15",
-    audioUrl: "/audio/nutrition-cycle.mp3",
-    publishedAt: "4 days ago",
-    featured: true,
-  },
-  {
-    id: 3,
-    title: "Managing Stress and Its Impact on Fertility",
-    author: {
-      name: "Dr. Hana Tadesse",
-      specialty: "Reproductive Health",
-      avatar: "/doctors/hana.jpg"
-    },
-    content: "Chronic stress can affect your fertility in multiple ways. The stress hormone cortisol can interfere with the hormones needed for ovulation...",
-    category: "Fertility",
-    readTime: "5 min",
-    hasVoiceNote: false,
-    publishedAt: "1 week ago",
-    featured: false,
-  },
-  {
-    id: 4,
-    title: "PCOS: Symptoms, Diagnosis, and Management",
-    author: {
-      name: "Dr. Amara Bekele",
-      specialty: "Gynecologist",
-      avatar: "/doctors/amara.jpg"
-    },
-    content: "Polycystic Ovary Syndrome (PCOS) affects up to 10% of women of reproductive age. Common symptoms include irregular periods, excess hair growth...",
-    category: "Conditions",
-    readTime: "10 min",
-    hasVoiceNote: true,
-    voiceDuration: "6:45",
-    audioUrl: "/audio/pcos-symptoms.mp3",
-    publishedAt: "1 week ago",
-    featured: false,
-  },
-  {
-    id: 5,
-    title: "The Connection Between Sleep and Hormonal Balance",
-    author: {
-      name: "Dr. Selam Haile",
-      specialty: "Nutritionist",
-      avatar: "/doctors/selam.jpg"
-    },
-    content: "Quality sleep is essential for maintaining hormonal balance. During sleep, your body produces important hormones like melatonin and growth hormone...",
-    category: "Wellness",
-    readTime: "7 min",
-    hasVoiceNote: true,
-    voiceDuration: "4:10",
-    audioUrl: "/audio/sleep-hormones.mp3",
-    publishedAt: "2 weeks ago",
-    featured: false,
-  },
-]
+type AdviceAttachment = {
+  name: string
+  url: string
+  mimeType?: string
+  size?: number
+}
+
+type KnowledgeArticle = {
+  id: string
+  title: string
+  author: {
+    name: string
+    specialty: string
+    avatar?: string
+  }
+  content: string
+  category: string
+  readTime: string
+  hasVoiceNote: boolean
+  voiceDuration?: string
+  audioUrl?: string
+  attachments: AdviceAttachment[]
+  publishedAt: string
+  featured: boolean
+}
 
 const categories = ["All", "Hormones", "Nutrition", "Fertility", "Conditions", "Wellness", "Mental Health"]
 
 export default function KnowledgeHubPage() {
+  const [articles, setArticles] = useState<KnowledgeArticle[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("All")
-  const [playingAudio, setPlayingAudio] = useState<number | null>(null)
+  const [playingAudio, setPlayingAudio] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  const getAudioUrl = (articleId: number) =>
+  useEffect(() => {
+    const loadKnowledgeHub = async () => {
+      try {
+        setIsLoading(true)
+        const items = await getDoctorAdvice({ status: "published" })
+        const mapped: KnowledgeArticle[] = Array.isArray(items)
+          ? items.map((item: any, index: number) => {
+              const textContent = String(item?.textContent || "")
+              const authorName = item?.doctorId?.userId?.displayName || "Doctor"
+              const specialty = item?.doctorId?.specialization || "Women's Health"
+              const words = textContent.trim() ? textContent.trim().split(/\s+/).length : 0
+              const readMinutes = Math.max(1, Math.ceil(words / 200))
+              const audioSeconds = Number(item?.audioDuration || 0)
+              const durationLabel = audioSeconds > 0
+                ? `${Math.floor(audioSeconds / 60)}:${String(audioSeconds % 60).padStart(2, "0")}`
+                : undefined
+
+              return {
+                id: String(item?._id || index),
+                title: String(item?.title || "Untitled"),
+                author: {
+                  name: authorName,
+                  specialty,
+                  avatar: "",
+                },
+                content: textContent,
+                category: String(item?.category || "Wellness"),
+                readTime: `${readMinutes} min`,
+                hasVoiceNote: Boolean(item?.voiceUrl),
+                voiceDuration: durationLabel,
+                audioUrl: item?.voiceUrl || "",
+                attachments: Array.isArray(item?.attachments)
+                  ? item.attachments
+                      .filter((file: any) => Boolean(file?.url))
+                      .map((file: any) => ({
+                        name: String(file?.name || "Attachment"),
+                        url: String(file?.url || ""),
+                        mimeType: file?.mimeType ? String(file.mimeType) : "",
+                        size: Number(file?.size || 0),
+                      }))
+                  : [],
+                publishedAt: item?.createdAt ? new Date(item.createdAt).toLocaleDateString() : "",
+                featured: index < 2,
+              }
+            })
+          : []
+        setArticles(mapped)
+      } catch {
+        setArticles([])
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    void loadKnowledgeHub()
+  }, [])
+
+  const getAudioUrl = (articleId: string) =>
     articles.find((article) => article.id === articleId)?.audioUrl || ""
 
-  const toggleAudio = (articleId: number) => {
+  const toggleAudio = (articleId: string) => {
     if (playingAudio === articleId) {
       setPlayingAudio(null)
     } else {
@@ -165,7 +166,7 @@ export default function KnowledgeHubPage() {
           Knowledge Hub
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Expert articles and voice notes from our trusted doctors
+          Expert articles and insights from our trusted doctors
         </p>
       </div>
 
@@ -197,24 +198,40 @@ export default function KnowledgeHubPage() {
         </TabsList>
 
         <TabsContent value={selectedCategory} className="mt-6 space-y-6">
+          {isLoading && (
+            <Card className="border-dashed">
+              <CardContent className="flex items-center justify-center py-10 text-sm text-muted-foreground">
+                Loading articles...
+              </CardContent>
+            </Card>
+          )}
+
           {/* Featured Articles */}
-          {featuredArticles.length > 0 && (
+          {!isLoading && featuredArticles.length > 0 && (
             <div className="space-y-4">
               <h2 className="text-lg font-semibold">Featured</h2>
               <div className="grid gap-4 md:grid-cols-2">
                 {featuredArticles.map((article) => (
-                  <Card key={article.id} className="overflow-hidden border-primary/20 bg-gradient-to-br from-primary/5 to-secondary/5">
+                  <Card key={article.id} className="overflow-hidden border-primary/20 bg-linear-to-br from-primary/5 to-secondary/5">
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between gap-2">
                         <Badge className="bg-primary/20 text-primary hover:bg-primary/30">
                           Featured
                         </Badge>
-                        {article.hasVoiceNote && (
-                          <Badge variant="outline" className="gap-1">
-                            <Headphones className="h-3 w-3" />
-                            {article.voiceDuration}
-                          </Badge>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {article.hasVoiceNote && (
+                            <Badge variant="outline" className="gap-1">
+                              <Headphones className="h-3 w-3" />
+                              {article.voiceDuration || "Voice"}
+                            </Badge>
+                          )}
+                          {article.attachments.length > 0 && (
+                            <Badge variant="outline" className="gap-1">
+                              <Paperclip className="h-3 w-3" />
+                              {article.attachments.length} file{article.attachments.length > 1 ? "s" : ""}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                       <CardTitle className="mt-2 text-lg leading-tight">
                         {article.title}
@@ -254,15 +271,32 @@ export default function KnowledgeHubPage() {
                           {playingAudio === article.id ? (
                             <>
                               <PauseCircle className="h-4 w-4 text-primary" />
-                              Pause Voice Note
+                              Pause Insight
                             </>
                           ) : (
                             <>
                               <PlayCircle className="h-4 w-4 text-secondary-foreground" />
-                              Play Voice Note
+                              Play Insight
                             </>
                           )}
                         </Button>
+                      )}
+
+                      {article.attachments.length > 0 && (
+                        <div className="space-y-2">
+                          {article.attachments.map((file, index) => (
+                            <Button
+                              key={`${article.id}-featured-file-${index}`}
+                              variant="ghost"
+                              size="sm"
+                              className="w-full justify-start gap-2"
+                              onClick={() => window.open(file.url, "_blank")}
+                            >
+                              <Download className="h-4 w-4" />
+                              <span className="truncate">{file.name}</span>
+                            </Button>
+                          ))}
+                        </div>
                       )}
                     </CardContent>
                   </Card>
@@ -272,6 +306,7 @@ export default function KnowledgeHubPage() {
           )}
 
           {/* All Articles */}
+          {!isLoading && (
           <div className="space-y-4">
             <h2 className="text-lg font-semibold">All Articles</h2>
             <div className="space-y-3">
@@ -289,13 +324,42 @@ export default function KnowledgeHubPage() {
                       <div className="flex-1 space-y-2">
                         <div className="flex items-start justify-between gap-2">
                           <h3 className="font-medium leading-tight">{article.title}</h3>
-                          <Badge variant="outline" className="shrink-0 text-xs">
-                            {article.category}
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="shrink-0 text-xs">
+                              {article.category}
+                            </Badge>
+                            {article.attachments.length > 0 && (
+                              <Badge variant="outline" className="shrink-0 gap-1 text-xs">
+                                <Paperclip className="h-3 w-3" />
+                                {article.attachments.length}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                         <p className="text-sm text-muted-foreground line-clamp-1">
                           {article.content}
                         </p>
+                        {article.attachments.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {article.attachments.slice(0, 2).map((file, index) => (
+                              <Button
+                                key={`${article.id}-regular-file-${index}`}
+                                variant="outline"
+                                size="sm"
+                                className="h-7 gap-1 text-xs"
+                                onClick={() => window.open(file.url, "_blank")}
+                              >
+                                <Download className="h-3 w-3" />
+                                <span className="max-w-35 truncate">{file.name}</span>
+                              </Button>
+                            ))}
+                            {article.attachments.length > 2 && (
+                              <Badge variant="secondary" className="h-7 px-2 text-xs">
+                                +{article.attachments.length - 2} more
+                              </Badge>
+                            )}
+                          </div>
+                        )}
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <User className="h-3 w-3" />
@@ -318,6 +382,17 @@ export default function KnowledgeHubPage() {
                                 )}
                               </Button>
                             )}
+                            {article.attachments.length > 0 && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 gap-1"
+                                onClick={() => window.open(article.attachments[0].url, "_blank")}
+                              >
+                                <Download className="h-4 w-4" />
+                                Open File
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -327,10 +402,11 @@ export default function KnowledgeHubPage() {
               ))}
             </div>
           </div>
+          )}
         </TabsContent>
       </Tabs>
 
-      {filteredArticles.length === 0 && (
+      {!isLoading && filteredArticles.length === 0 && (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <BookOpen className="mb-4 h-12 w-12 text-muted-foreground/50" />

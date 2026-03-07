@@ -445,6 +445,59 @@ Optional filters:
 }
 ```
 
+### Gemini Chat (AI assistant)
+
+Before using these endpoints, set in `backend/.env`:
+
+```text
+GEMINI_API_KEY=your_google_ai_api_key
+GEMINI_MODEL=gemini-1.5-flash
+```
+
+### Chat with Gemini
+- POST `/api/ai-conversations/chat`
+
+```json
+{
+  "userId": "USER_ID",
+  "conversationId": "AI_CONVERSATION_ID",
+  "message": "I have irregular cycle and fatigue, what should I track before seeing a doctor?"
+}
+```
+
+### Summarize Community Post
+- POST `/api/ai-conversations/summarize/post`
+
+```json
+{
+  "userId": "USER_ID",
+  "postId": "POST_ID",
+  "conversationId": "AI_CONVERSATION_ID"
+}
+```
+
+### Summarize Doctor Article
+- POST `/api/ai-conversations/summarize/article`
+
+```json
+{
+  "userId": "USER_ID",
+  "articleId": "ADVICE_TEXT_ID",
+  "conversationId": "AI_CONVERSATION_ID"
+}
+```
+
+### Suggest Doctors
+- POST `/api/ai-conversations/suggest-doctors`
+
+```json
+{
+  "userId": "USER_ID",
+  "conversationId": "AI_CONVERSATION_ID",
+  "query": "I have frequent period pain and need a verified gynecology specialist."
+}
+```
+
 ---
 
 ## 8) Personal Assistance (AI summary storage)

@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 const userRoutes = require("./routes/userRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const doctorRoutes = require("./routes/doctorRoutes");
@@ -11,6 +12,7 @@ const chatRoutes = require("./routes/chatRoutes");
 const messageRoutes = require("./routes/messageRoutes");
 const aiConversationRoutes = require("./routes/aiConversationRoutes");
 const personalAssistanceRoutes = require("./routes/personalAssistanceRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
 
 const app = express();
 
@@ -46,6 +48,7 @@ app.use(
 );
 
 app.use(express.json());
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.get("/", (_req, res) => {
   res.status(200).json({ message: "API is running" });
@@ -62,6 +65,7 @@ app.use("/api/chats", chatRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/ai-conversations", aiConversationRoutes);
 app.use("/api/personal-assistance", personalAssistanceRoutes);
+app.use("/api/payments", paymentRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({

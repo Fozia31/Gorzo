@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -45,49 +45,21 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
+import { useAuth } from "@/lib/auth-context"
+import { deletePost, getPosts, updatePost } from "@/api/postApi"
 
-// Sample user's posts
-const initialUserPosts = [
-  {
-    id: 1,
-    username: "Selam123",
-    avatar: "S1",
-    title: "My experience with endometriosis diagnosis",
-    content: "After years of unexplained pain, I finally got diagnosed with endometriosis. I want to share my journey and what helped me get the right diagnosis. The key was finding a doctor who actually listened...",
-    category: "Conditions",
-    likes: 45,
-    comments: 23,
-    timeAgo: "3d ago",
-    createdAt: "2024-01-15",
-    isLiked: false,
-  },
-  {
-    id: 2,
-    username: "Selam123",
-    avatar: "S1",
-    title: "Natural supplements that helped my hormonal balance",
-    content: "I've been struggling with hormonal imbalance for a while. After consulting with my doctor, I started taking some supplements that really helped. Here's what worked for me...",
-    category: "Hormones",
-    likes: 67,
-    comments: 31,
-    timeAgo: "1w ago",
-    createdAt: "2024-01-10",
-    isLiked: false,
-  },
-  {
-    id: 3,
-    username: "Selam123",
-    avatar: "S1",
-    title: "How I manage anxiety during my cycle",
-    content: "Does anyone else experience heightened anxiety before their period? I've developed some coping strategies that have been really helpful. Would love to hear what works for others too.",
-    category: "Mental Health",
-    likes: 89,
-    comments: 42,
-    timeAgo: "2w ago",
-    createdAt: "2024-01-03",
-    isLiked: false,
-  },
-]
+type MyPost = {
+  id: string
+  username: string
+  avatar: string
+  title: string
+  content: string
+  category: string
+  likes: number
+  comments: number
+  timeAgo: string
+  createdAt: string
+}
 
 const categories = [
   "Menstrual Health",
@@ -101,13 +73,50 @@ const categories = [
 ]
 
 export default function MyPostsPage() {
-  const [posts, setPosts] = useState(initialUserPosts)
+  const { user } = useAuth()
+  const [posts, setPosts] = useState<MyPost[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [editingPost, setEditingPost] = useState<typeof initialUserPosts[0] | null>(null)
-  const [deletingPostId, setDeletingPostId] = useState<number | null>(null)
+  const [editingPost, setEditingPost] = useState<MyPost | null>(null)
+  const [deletingPostId, setDeletingPostId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ title: "", content: "", category: "" })
 
-  const handleEdit = (post: typeof initialUserPosts[0]) => {
+  const fetchMyPosts = async () => {
+    if (!user?.id) {
+      setPosts([])
+      setLoading(false)
+      return
+    }
+
+    try {
+      setLoading(true)
+      const data = await getPosts({ userId: user.id })
+      const mapped = (data || []).map((post: any) => ({
+        id: post._id,
+        username: user.username,
+        avatar: user.username.slice(0, 2).toUpperCase(),
+        title: post.title,
+        content: post.content,
+        category: post.category,
+        likes: post.likes || 0,
+        comments: 0,
+        timeAgo: new Date(post.createdAt).toLocaleString(),
+        createdAt: post.createdAt,
+      }))
+      setPosts(mapped)
+    } catch (error) {
+      console.error("Failed to load user posts", error)
+      alert("Failed to load your posts")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchMyPosts()
+  }, [user?.id])
+
+  const handleEdit = (post: MyPost) => {
     setEditingPost(post)
     setEditForm({
       title: post.title,
@@ -116,32 +125,55 @@ export default function MyPostsPage() {
     })
   }
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editingPost) return
-    
-    setPosts(posts.map(post => {
-      if (post.id === editingPost.id) {
-        return {
-          ...post,
-          title: editForm.title,
-          content: editForm.content,
-          category: editForm.category,
-        }
-      }
-      return post
-    }))
-    setEditingPost(null)
-    setEditForm({ title: "", content: "", category: "" })
+
+    try {
+      const updated = await updatePost(editingPost.id, {
+        title: editForm.title,
+        content: editForm.content,
+        category: editForm.category,
+      })
+
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.id === editingPost.id
+            ? {
+                ...post,
+                title: updated.title,
+                content: updated.content,
+                category: updated.category,
+              }
+            : post
+        )
+      )
+      setEditingPost(null)
+      setEditForm({ title: "", content: "", category: "" })
+    } catch (error) {
+      console.error("Failed to update post", error)
+      alert("Failed to update post")
+    }
   }
 
-  const handleDelete = (postId: number) => {
-    setPosts(posts.filter(post => post.id !== postId))
-    setDeletingPostId(null)
+  const handleDelete = async (postId: string) => {
+    try {
+      await deletePost(postId)
+      setPosts((prev) => prev.filter((post) => post.id !== postId))
+      setDeletingPostId(null)
+    } catch (error) {
+      console.error("Failed to delete post", error)
+      alert("Failed to delete post")
+    }
   }
 
-  const filteredPosts = posts.filter(post => 
-    post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    post.content.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredPosts = useMemo(
+    () =>
+      posts.filter(
+        (post) =>
+          post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          post.content.toLowerCase().includes(searchQuery.toLowerCase())
+      ),
+    [posts, searchQuery]
   )
 
   return (
@@ -217,7 +249,13 @@ export default function MyPostsPage() {
       </div>
 
       {/* Posts List */}
-      {filteredPosts.length === 0 ? (
+      {loading ? (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <p className="text-sm text-muted-foreground">Loading your posts...</p>
+          </CardContent>
+        </Card>
+      ) : filteredPosts.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <div className="rounded-full bg-muted p-4 mb-4">

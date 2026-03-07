@@ -100,7 +100,7 @@ export default function HomePage() {
                 </div>
                 <h3 className="text-lg font-semibold">Knowledge Hub</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Access articles and voice notes from certified healthcare professionals.
+                  Access articles and insights from certified healthcare professionals.
                 </p>
               </div>
 

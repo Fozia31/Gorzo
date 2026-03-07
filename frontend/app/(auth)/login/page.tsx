@@ -47,6 +47,8 @@ export default function LoginPage() {
       login(frontendUser)
       if (frontendUser.role === 'admin') {
         router.push('/admin')
+      } else if (frontendUser.role === 'doctor') {
+        router.push('/doctor')
       } else {
         router.push('/dashboard')
       }

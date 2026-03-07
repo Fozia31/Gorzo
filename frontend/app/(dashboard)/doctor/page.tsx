@@ -28,7 +28,15 @@ import {
   getDoctorRatings,
   updateDoctorAvailability,
 } from "@/api/doctorApi"
-import { createDoctorAdvice, getDoctorAdviceByDoctor } from "@/api/doctorAdviceApi"
+import {
+  createDoctorAdvice,
+  deleteDoctorAdvice,
+  getDoctorAdviceById,
+  getDoctorAdviceByDoctor,
+  updateDoctorAdvice,
+  uploadDoctorAdviceAudio,
+  uploadDoctorAdviceFiles,
+} from "@/api/doctorAdviceApi"
 import { getOrCreateDoctorChat } from "@/api/chatApi"
 import { sendMessage } from "@/api/messageApi"
 import { 
@@ -65,141 +73,50 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 
-// Sample patients
-const samplePatients = [
-  {
-    id: 1,
-    username: "WellnessSeeker",
-    avatar: "WS",
-    lastVisit: "2 hours ago",
-    status: "active",
-    tier: "premium",
-    unreadMessages: 2,
-    consultations: 5,
-    joinedDate: "Jan 2024",
-  },
-  {
-    id: 2,
-    username: "BloomingFlower",
-    avatar: "BF",
-    lastVisit: "Yesterday",
-    status: "active",
-    tier: "premium",
-    unreadMessages: 0,
-    consultations: 3,
-    joinedDate: "Feb 2024",
-  },
-  {
-    id: 3,
-    username: "HopefulMama",
-    avatar: "HM",
-    lastVisit: "3 days ago",
-    status: "inactive",
-    tier: "premium",
-    unreadMessages: 1,
-    consultations: 8,
-    joinedDate: "Nov 2023",
-  },
-  {
-    id: 4,
-    username: "StrongSister",
-    avatar: "SS",
-    lastVisit: "1 week ago",
-    status: "inactive",
-    tier: "free",
-    unreadMessages: 0,
-    consultations: 1,
-    joinedDate: "Mar 2024",
-  },
-]
+type DashboardPatient = {
+  id: string
+  username: string
+  avatar: string
+  lastVisit: string
+  status: "active" | "inactive"
+  tier: "premium" | "free"
+  unreadMessages: number
+  consultations: number
+  joinedDate: string
+}
 
-// Sample published articles
-const samplePublishedArticles = [
-  {
-    id: 1,
-    title: "Understanding Your Hormonal Cycle: A Complete Guide",
-    category: "Hormones",
-    publishedAt: "2 days ago",
-    views: 234,
-    hasVoiceNote: true,
-  },
-  {
-    id: 2,
-    title: "Nutrition Tips for Each Phase of Your Cycle",
-    category: "Nutrition",
-    publishedAt: "4 days ago",
-    views: 156,
-    hasVoiceNote: true,
-  },
-  {
-    id: 3,
-    title: "Managing Stress and Its Impact on Fertility",
-    category: "Fertility",
-    publishedAt: "1 week ago",
-    views: 89,
-    hasVoiceNote: false,
-  },
-]
+type PublishedArticle = {
+  id: string | number
+  title: string
+  category: string
+  publishedAt: string
+  views: number
+  hasVoiceNote: boolean
+}
+
+type RatingReview = {
+  id: string | number
+  user: string
+  rating: number
+  comment: string
+  date: string
+  anonymous: boolean
+}
 
 const categories = ["Hormones", "Nutrition", "Fertility", "Conditions", "Wellness", "Mental Health"]
 
-// Sample ratings from patients
-const sampleRatings = [
-  {
-    id: 1,
-    user: "Selam123",
-    rating: 5,
-    comment: "Dr. Amara was incredibly helpful and understanding. She took the time to explain everything clearly and made me feel comfortable discussing sensitive topics.",
-    date: "2 days ago",
-    anonymous: false,
-  },
-  {
-    id: 2,
-    user: "Anonymous User",
-    rating: 5,
-    comment: "Best consultation experience I've had. Very professional and caring approach.",
-    date: "1 week ago",
-    anonymous: true,
-  },
-  {
-    id: 3,
-    user: "HealthyMama22",
-    rating: 4,
-    comment: "Good advice, though response took a bit longer than expected. Would still recommend.",
-    date: "2 weeks ago",
-    anonymous: false,
-  },
-  {
-    id: 4,
-    user: "WellnessJourney",
-    rating: 5,
-    comment: "Dr. Amara helped me understand my cycle better. Her advice was practical and easy to follow. Highly recommend!",
-    date: "3 weeks ago",
-    anonymous: false,
-  },
-  {
-    id: 5,
-    user: "Anonymous User",
-    rating: 4,
-    comment: "Very knowledgeable and patient. Answered all my questions thoroughly.",
-    date: "1 month ago",
-    anonymous: true,
-  },
-]
-
-// Rating statistics
-const sampleRatingStats = {
-  average: 4.9,
-  total: 156,
+const emptyRatingStats = {
+  average: 0,
+  total: 0,
   distribution: [
-    { stars: 5, count: 128, percentage: 82 },
-    { stars: 4, count: 22, percentage: 14 },
-    { stars: 3, count: 4, percentage: 3 },
-    { stars: 2, count: 1, percentage: 1 },
-    { stars: 1, count: 1, percentage: 0 },
+    { stars: 5, count: 0, percentage: 0 },
+    { stars: 4, count: 0, percentage: 0 },
+    { stars: 3, count: 0, percentage: 0 },
+    { stars: 2, count: 0, percentage: 0 },
+    { stars: 1, count: 0, percentage: 0 },
   ],
-  thisMonth: 12,
-  lastMonth: 8,
+  thisMonth: 0,
+  lastMonth: 0,
 }
 
 // Days of the week
@@ -270,22 +187,22 @@ const availabilityPayloadFromRecord = (record: AvailabilityRecord) => {
 }
 
 export default function DoctorDashboardPage() {
-  const { user, login } = useAuth()
+  const { user } = useAuth()
   const userId = user?.id
   const [doctorRecordId, setDoctorRecordId] = useState<string>("")
-  const [patients, setPatients] = useState(samplePatients)
-  const [publishedArticles, setPublishedArticles] = useState(samplePublishedArticles)
-  const [myRatings, setMyRatings] = useState(sampleRatings)
-  const [ratingStats, setRatingStats] = useState(sampleRatingStats)
+  const [patients, setPatients] = useState<DashboardPatient[]>([])
+  const [publishedArticles, setPublishedArticles] = useState<PublishedArticle[]>([])
+  const [myRatings, setMyRatings] = useState<RatingReview[]>([])
+  const [ratingStats, setRatingStats] = useState(emptyRatingStats)
   const [dashboardSummary, setDashboardSummary] = useState({
-    patients: samplePatients.length,
-    unreadMessages: samplePatients.reduce((acc, p) => acc + p.unreadMessages, 0),
-    publishedArticles: samplePublishedArticles.length,
-    ratingAverage: sampleRatingStats.average,
-    ratingTotal: sampleRatingStats.total,
+    patients: 0,
+    unreadMessages: 0,
+    publishedArticles: 0,
+    ratingAverage: 0,
+    ratingTotal: 0,
   })
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedPatient, setSelectedPatient] = useState<typeof samplePatients[0] | null>(null)
+  const [selectedPatient, setSelectedPatient] = useState<DashboardPatient | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
   const [hasRecording, setHasRecording] = useState(false)
@@ -299,37 +216,49 @@ export default function DoctorDashboardPage() {
   })
   const [availability, setAvailability] = useState<AvailabilityRecord>(initialAvailability)
   const [isSavingAvailability, setIsSavingAvailability] = useState(false)
-  const [uploadedFiles, setUploadedFiles] = useState<{ name: string; size: number; type: string }[]>([])
+  const [isPublishing, setIsPublishing] = useState(false)
+  const [isEditArticleDialogOpen, setIsEditArticleDialogOpen] = useState(false)
+  const [editingArticleId, setEditingArticleId] = useState<string | number | null>(null)
+  const [isSavingArticleEdit, setIsSavingArticleEdit] = useState(false)
+  const [deletingArticleId, setDeletingArticleId] = useState<string | number | null>(null)
+  const [editArticleData, setEditArticleData] = useState({
+    title: "",
+    category: "Hormones",
+    content: "",
+  })
+  const [uploadedFiles, setUploadedFiles] = useState<
+    { name: string; size: number; type: string; url: string }[]
+  >([])
+  const [uploadedAudio, setUploadedAudio] = useState<{
+    name: string
+    size: number
+    type: string
+    url: string
+  } | null>(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [isUploadingAudio, setIsUploadingAudio] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const audioInputRef = useRef<HTMLInputElement>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
-
-  // Auto-login for demo
-  useEffect(() => {
-    if (!user) {
-      login({
-        id: "2",
-        username: "Dr. Amara Bekele",
-        email: "doctor@example.com",
-        role: "doctor",
-        tier: "premium",
-      })
-    }
-  }, [user, login])
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const recordedChunksRef = useRef<Blob[]>([])
+  const recordingStreamRef = useRef<MediaStream | null>(null)
 
   useEffect(() => {
     const loadDoctorRecordId = async () => {
       if (!userId) return
       try {
         const doctor = await getDoctorByUserId(userId)
-        if (doctor?._id) setDoctorRecordId(String(doctor._id))
+        if (doctor?._id) {
+          setDoctorRecordId(String(doctor._id))
+        }
       } catch {
         setDoctorRecordId("")
       }
     }
 
     void loadDoctorRecordId()
-  }, [userId])
+  }, [userId, user?.email, user?.username])
 
   useEffect(() => {
     const loadDashboard = async () => {
@@ -375,29 +304,27 @@ export default function DoctorDashboardPage() {
           setAvailability(availabilityRecordFromApi(apiAvailability))
         }
 
-        if (stats) {
-          setRatingStats({
-            average: Number(stats.average || 0),
-            total: Number(stats.total || 0),
-            distribution: Array.isArray(stats.distribution) ? stats.distribution : sampleRatingStats.distribution,
-            thisMonth: Number(stats.thisMonth || 0),
-            lastMonth: Number(stats.lastMonth || 0),
-          })
-        }
+        setRatingStats({
+          average: Number(stats?.average || 0),
+          total: Number(stats?.total || 0),
+          distribution: Array.isArray(stats?.distribution)
+            ? stats.distribution
+            : emptyRatingStats.distribution,
+          thisMonth: Number(stats?.thisMonth || 0),
+          lastMonth: Number(stats?.lastMonth || 0),
+        })
 
-        if (Array.isArray(ratingsResponse?.data)) {
-          const mappedRatings = ratingsResponse.data.map((item: any) => ({
-            id: item.id,
-            user: item.user,
-            rating: item.rating,
-            comment: item.comment,
-            date: toRelativeTime(item.date),
-            anonymous: Boolean(item.anonymous),
-          }))
-          if (mappedRatings.length > 0) {
-            setMyRatings(mappedRatings)
-          }
-        }
+        const mappedRatings = Array.isArray(ratingsResponse?.data)
+          ? ratingsResponse.data.map((item: any) => ({
+              id: item.id,
+              user: item.user,
+              rating: item.rating,
+              comment: item.comment,
+              date: toRelativeTime(item.date),
+              anonymous: Boolean(item.anonymous),
+            }))
+          : []
+        setMyRatings(mappedRatings)
 
         if (Array.isArray(adviceItems)) {
           setPublishedArticles(
@@ -412,32 +339,107 @@ export default function DoctorDashboardPage() {
           )
         }
       } catch {
-        // Keep fallback demo data when API fails.
+        // Keep already loaded values on API errors.
       }
     }
 
     void loadDashboard()
   }, [doctorRecordId])
 
-  const startRecording = () => {
-    setIsRecording(true)
-    setRecordingTime(0)
-    timerRef.current = setInterval(() => {
-      setRecordingTime((prev) => prev + 1)
-    }, 1000)
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+      }
+      if (recordingStreamRef.current) {
+        recordingStreamRef.current.getTracks().forEach((track) => track.stop())
+      }
+    }
+  }, [])
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      recordingStreamRef.current = stream
+      recordedChunksRef.current = []
+
+      const recorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = recorder
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          recordedChunksRef.current.push(event.data)
+        }
+      }
+
+      recorder.start()
+      setUploadedAudio(null)
+      setHasRecording(false)
+      setIsRecording(true)
+      setRecordingTime(0)
+      timerRef.current = setInterval(() => {
+        setRecordingTime((prev) => prev + 1)
+      }, 1000)
+    } catch {
+      alert("Microphone access denied or unavailable.")
+    }
   }
 
   const stopRecording = () => {
+    const recorder = mediaRecorderRef.current
+    if (!recorder) return
+
     setIsRecording(false)
     if (timerRef.current) {
       clearInterval(timerRef.current)
+      timerRef.current = null
     }
-    setHasRecording(true)
+
+    recorder.onstop = async () => {
+      try {
+        const audioBlob = new Blob(recordedChunksRef.current, { type: recorder.mimeType || "audio/webm" })
+        if (!audioBlob.size) throw new Error("Empty audio")
+
+        setIsUploadingAudio(true)
+        const extension = recorder.mimeType.includes("webm") ? "webm" : "wav"
+        const audioFile = new window.File([audioBlob], `recording-${Date.now()}.${extension}`, {
+          type: recorder.mimeType || "audio/webm",
+        })
+
+        const audioMeta = await uploadDoctorAdviceAudio(audioFile)
+        setUploadedAudio({
+          name: audioMeta?.name || audioFile.name,
+          size: Number(audioMeta?.size || audioFile.size || 0),
+          type: audioMeta?.mimeType || audioFile.type || "audio/webm",
+          url: audioMeta?.url || "",
+        })
+        setHasRecording(true)
+      } catch {
+        alert("Failed to save recorded audio. Please try again.")
+        setHasRecording(false)
+      } finally {
+        setIsUploadingAudio(false)
+        recordedChunksRef.current = []
+        mediaRecorderRef.current = null
+        if (recordingStreamRef.current) {
+          recordingStreamRef.current.getTracks().forEach((track) => track.stop())
+          recordingStreamRef.current = null
+        }
+      }
+    }
+
+    recorder.stop()
   }
 
   const deleteRecording = () => {
     setHasRecording(false)
     setRecordingTime(0)
+    setUploadedAudio(null)
+    recordedChunksRef.current = []
+    if (recordingStreamRef.current) {
+      recordingStreamRef.current.getTracks().forEach((track) => track.stop())
+      recordingStreamRef.current = null
+    }
   }
 
   const formatTime = (seconds: number) => {
@@ -446,17 +448,66 @@ export default function DoctorDashboardPage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  const handlePublish = async () => {
+  const resolveDoctorRecordId = async () => {
+    if (doctorRecordId) return doctorRecordId
+    if (!userId) return ""
+
     try {
-      if (!doctorRecordId) throw new Error("Missing doctor id")
+      const doctor = await getDoctorByUserId(userId)
+      if (doctor?._id) {
+        const id = String(doctor._id)
+        setDoctorRecordId(id)
+        return id
+      }
+    } catch {
+      // no-op, handled by caller
+    }
+
+    return ""
+  }
+
+  const handlePublish = async () => {
+    const resolvedDoctorId = await resolveDoctorRecordId()
+    if (!resolvedDoctorId) {
+      alert("Doctor profile not found. Please sign in with a doctor account linked by admin.")
+      return
+    }
+
+    const trimmedTitle = articleData.title.trim()
+    const trimmedContent = articleData.content.trim()
+    const hasAudio = Boolean(uploadedAudio?.url)
+    const hasFiles = uploadedFiles.length > 0
+    const hasText = Boolean(trimmedContent)
+
+    if (!trimmedTitle) {
+      alert("Please add an article title before publishing.")
+      return
+    }
+
+    if (!hasText && !hasAudio && !hasFiles) {
+      alert("Add article content, audio, or file attachment before publishing.")
+      return
+    }
+
+    const contentType = hasAudio && hasText ? "Mixed" : hasAudio ? "VoiceURL" : "Text"
+    const finalTextContent = hasText ? trimmedContent : hasFiles ? "See attached files." : ""
+
+    setIsPublishing(true)
+    try {
       const created = await createDoctorAdvice({
-        doctorId: doctorRecordId,
-        title: articleData.title,
+        doctorId: resolvedDoctorId,
+        title: trimmedTitle,
         category: articleData.category,
-        contentType: hasRecording ? "Mixed" : "Text",
-        textContent: articleData.content,
-        voiceUrl: hasRecording ? "local://voice-note" : "",
-        audioDuration: recordingTime,
+        contentType,
+        textContent: finalTextContent,
+        voiceUrl: uploadedAudio?.url || "",
+        audioDuration: hasAudio ? recordingTime : 0,
+        attachments: uploadedFiles.map((file) => ({
+          name: file.name,
+          url: file.url,
+          mimeType: file.type,
+          size: file.size,
+        })),
         status: "published",
       })
 
@@ -467,41 +518,179 @@ export default function DoctorDashboardPage() {
           category: created?.category || articleData.category,
           publishedAt: "just now",
           views: Number(created?.viewsCount || 0),
-          hasVoiceNote: Boolean(created?.voiceUrl) || hasRecording,
+          hasVoiceNote: Boolean(created?.voiceUrl) || Boolean(uploadedAudio?.url),
         },
         ...prev,
       ])
       setDashboardSummary((prev) => ({ ...prev, publishedArticles: prev.publishedArticles + 1 }))
-      alert("Article published successfully!")
-    } catch {
-      alert("Failed to publish article. Please try again.")
-    } finally {
       setArticleData({ title: "", category: "Hormones", content: "" })
       setHasRecording(false)
       setRecordingTime(0)
       setUploadedFiles([])
+      setUploadedAudio(null)
+      alert("Article published successfully!")
+    } catch (error: any) {
+      const apiMessage =
+        error?.message ||
+        error?.error ||
+        error?.response?.data?.message ||
+        "Failed to publish article. Please try again."
+      alert(apiMessage)
+    } finally {
+      setIsPublishing(false)
     }
   }
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files) return
 
     setIsUploading(true)
-
-    // Simulate upload delay.
-    setTimeout(() => {
-      const newFiles = Array.from(files).map((file) => ({
-        name: file.name,
-        size: file.size,
-        type: file.type,
-      }))
+    try {
+      const selectedFiles = Array.from(files)
+      const uploaded = await uploadDoctorAdviceFiles(selectedFiles)
+      const newFiles: { name: string; size: number; type: string; url: string }[] = Array.isArray(uploaded)
+        ? uploaded.map((file: any) => ({
+            name: file.name,
+            size: Number(file.size || 0),
+            type: file.mimeType || "application/octet-stream",
+            url: String(file.url || ""),
+          }))
+        : []
       setUploadedFiles((prev) => [...prev, ...newFiles])
+    } catch {
+      alert("Failed to upload files. Please try again.")
+    } finally {
       setIsUploading(false)
       if (fileInputRef.current) {
         fileInputRef.current.value = ""
       }
-    }, 1000)
+    }
+  }
+
+  const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    setIsUploadingAudio(true)
+    try {
+      const audioMeta = await uploadDoctorAdviceAudio(files[0])
+      setUploadedAudio({
+        name: audioMeta?.name || files[0].name,
+        size: Number(audioMeta?.size || files[0].size || 0),
+        type: audioMeta?.mimeType || files[0].type || "audio/mpeg",
+        url: audioMeta?.url || "",
+      })
+      setHasRecording(true)
+      setRecordingTime(0)
+    } catch {
+      alert("Failed to upload audio. Please try again.")
+    } finally {
+      setIsUploadingAudio(false)
+      if (audioInputRef.current) {
+        audioInputRef.current.value = ""
+      }
+    }
+  }
+
+  const handleOpenEditArticle = async (article: any) => {
+    setEditingArticleId(article.id)
+    setEditArticleData({
+      title: article.title || "",
+      category: article.category || "Hormones",
+      content: "",
+    })
+    setIsEditArticleDialogOpen(true)
+
+    if (typeof article.id !== "string") return
+
+    try {
+      const details = await getDoctorAdviceById(article.id)
+      setEditArticleData({
+        title: details?.title || article.title || "",
+        category: details?.category || article.category || "Hormones",
+        content: details?.textContent || "",
+      })
+    } catch {
+      // Keep optimistic values if details fetch fails.
+    }
+  }
+
+  const handleSaveArticleEdit = async () => {
+    if (!editingArticleId) return
+    const trimmedTitle = editArticleData.title.trim()
+
+    if (!trimmedTitle) {
+      alert("Article title is required.")
+      return
+    }
+
+    setIsSavingArticleEdit(true)
+    try {
+      if (typeof editingArticleId === "string") {
+        const updated = await updateDoctorAdvice(editingArticleId, {
+          title: trimmedTitle,
+          category: editArticleData.category,
+          textContent: editArticleData.content,
+        })
+
+        setPublishedArticles((prev) =>
+          prev.map((item: any) =>
+            item.id === editingArticleId
+              ? {
+                  ...item,
+                  title: updated?.title || trimmedTitle,
+                  category: updated?.category || editArticleData.category,
+                  hasVoiceNote: Boolean(updated?.voiceUrl) || item.hasVoiceNote,
+                }
+              : item
+          )
+        )
+      } else {
+        setPublishedArticles((prev) =>
+          prev.map((item: any) =>
+            item.id === editingArticleId
+              ? {
+                  ...item,
+                  title: trimmedTitle,
+                  category: editArticleData.category,
+                }
+              : item
+          )
+        )
+      }
+
+      setIsEditArticleDialogOpen(false)
+      setEditingArticleId(null)
+      alert("Article updated successfully!")
+    } catch {
+      alert("Failed to update article. Please try again.")
+    } finally {
+      setIsSavingArticleEdit(false)
+    }
+  }
+
+  const handleDeletePublishedArticle = async (articleId: string | number) => {
+    const confirmed = window.confirm("Are you sure you want to delete this article?")
+    if (!confirmed) return
+
+    setDeletingArticleId(articleId)
+    try {
+      if (typeof articleId === "string") {
+        await deleteDoctorAdvice(articleId)
+      }
+
+      setPublishedArticles((prev) => prev.filter((item: any) => item.id !== articleId))
+      setDashboardSummary((prev) => ({
+        ...prev,
+        publishedArticles: Math.max(0, prev.publishedArticles - 1),
+      }))
+      alert("Article deleted successfully!")
+    } catch {
+      alert("Failed to delete article. Please try again.")
+    } finally {
+      setDeletingArticleId(null)
+    }
   }
 
   const removeFile = (index: number) => {
@@ -546,7 +735,7 @@ export default function DoctorDashboardPage() {
           voiceUrl: "local://voice-note",
           durationSec: recordingTime,
         })
-        alert(`Voice note sent to ${selectedPatient.username}`)
+        alert(`Insight sent to ${selectedPatient.username}`)
         setHasRecording(false)
         setRecordingTime(0)
         setSendingVoiceNote(false)
@@ -792,7 +981,7 @@ export default function DoctorDashboardPage() {
                           <DialogHeader>
                             <DialogTitle>Send Message to {patient.username}</DialogTitle>
                             <DialogDescription>
-                              Send a text message or voice note to your patient
+                              Send a text message or insight to your patient
                             </DialogDescription>
                           </DialogHeader>
                           <div className="space-y-4 py-4">
@@ -800,7 +989,7 @@ export default function DoctorDashboardPage() {
                               <TabsList className="grid w-full grid-cols-2">
                                 <TabsTrigger value="text">Text Message</TabsTrigger>
                                 <TabsTrigger value="voice" onClick={() => setSendingVoiceNote(true)}>
-                                  Voice Note
+                                  Insight
                                 </TabsTrigger>
                               </TabsList>
                               <TabsContent value="text" className="mt-4">
@@ -1125,6 +1314,13 @@ export default function DoctorDashboardPage() {
                   </CardContent>
                 </Card>
               ))}
+              {myRatings.length === 0 && (
+                <Card className="border-dashed">
+                  <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                    No ratings yet.
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             <div className="text-center">
@@ -1206,6 +1402,14 @@ export default function DoctorDashboardPage() {
                 onChange={handleFileUpload}
                 className="hidden"
               />
+
+              <input
+                ref={audioInputRef}
+                type="file"
+                accept="audio/*"
+                onChange={handleAudioUpload}
+                className="hidden"
+              />
               
               {/* Drop zone / Upload button */}
               <div 
@@ -1251,12 +1455,17 @@ export default function DoctorDashboardPage() {
                               <FileIcon className="h-5 w-5 text-muted-foreground" />
                             </div>
                             <div>
-                              <p className="text-sm font-medium truncate max-w-[200px]">{file.name}</p>
+                              <p className="text-sm font-medium truncate max-w-50">{file.name}</p>
                               <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => window.open(file.url, "_blank")}
+                            >
                               <Download className="h-4 w-4" />
                             </Button>
                             <Button 
@@ -1284,7 +1493,7 @@ export default function DoctorDashboardPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Mic className="h-5 w-5 text-primary" />
-                Voice Note
+                Insight
               </CardTitle>
               <CardDescription>
                 Record or upload an audio summary
@@ -1321,9 +1530,14 @@ export default function DoctorDashboardPage() {
                             <Mic className="h-4 w-4" />
                             Start Recording
                           </Button>
-                          <Button variant="outline" className="gap-2">
+                          <Button
+                            variant="outline"
+                            className="gap-2"
+                            onClick={() => audioInputRef.current?.click()}
+                            disabled={isUploadingAudio}
+                          >
                             <Upload className="h-4 w-4" />
-                            Upload Audio
+                            {isUploadingAudio ? "Uploading..." : "Upload Audio"}
                           </Button>
                         </div>
                       </>
@@ -1335,8 +1549,11 @@ export default function DoctorDashboardPage() {
                       <Check className="h-8 w-8 text-secondary-foreground" />
                     </div>
                     <div className="text-center">
-                      <p className="font-medium">Voice note recorded</p>
+                      <p className="font-medium">Insight recorded</p>
                       <p className="text-sm text-muted-foreground">Duration: {formatTime(recordingTime)}</p>
+                      {uploadedAudio?.name && (
+                        <p className="text-xs text-muted-foreground">{uploadedAudio.name}</p>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" onClick={() => setIsPlaying(!isPlaying)}>
@@ -1359,9 +1576,12 @@ export default function DoctorDashboardPage() {
               <Save className="mr-2 h-4 w-4" />
               Save Draft
             </Button>
-            <Button onClick={handlePublish} disabled={!articleData.title || !articleData.content}>
+            <Button
+              onClick={handlePublish}
+              disabled={!articleData.title.trim() || isPublishing}
+            >
               <Check className="mr-2 h-4 w-4" />
-              Publish Article
+              {isPublishing ? "Publishing..." : "Publish Article"}
             </Button>
           </div>
         </TabsContent>
@@ -1395,10 +1615,16 @@ export default function DoctorDashboardPage() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" onClick={() => handleOpenEditArticle(article)}>
                       Edit
                     </Button>
-                    <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => handleDeletePublishedArticle(article.id)}
+                      disabled={deletingArticleId === article.id}
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -1408,6 +1634,69 @@ export default function DoctorDashboardPage() {
           ))}
         </TabsContent>
       </Tabs>
+
+      <Dialog open={isEditArticleDialogOpen} onOpenChange={setIsEditArticleDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Article</DialogTitle>
+            <DialogDescription>
+              Update article details and save changes.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="edit-article-title">Title</Label>
+              <Input
+                id="edit-article-title"
+                value={editArticleData.title}
+                onChange={(e) =>
+                  setEditArticleData((prev) => ({ ...prev, title: e.target.value }))
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-article-category">Category</Label>
+              <select
+                id="edit-article-category"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={editArticleData.category}
+                onChange={(e) =>
+                  setEditArticleData((prev) => ({ ...prev, category: e.target.value }))
+                }
+              >
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-article-content">Content</Label>
+              <Textarea
+                id="edit-article-content"
+                rows={8}
+                value={editArticleData.content}
+                onChange={(e) =>
+                  setEditArticleData((prev) => ({ ...prev, content: e.target.value }))
+                }
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditArticleDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveArticleEdit} disabled={isSavingArticleEdit}>
+              {isSavingArticleEdit ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

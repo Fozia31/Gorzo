@@ -36,3 +36,12 @@ export const deletePost = async (postId) => {
     throw error.response?.data || error.message;
   }
 };
+
+export const updatePost = async (postId, payload) => {
+  try {
+    const response = await api.put(`/posts/${postId}`, payload);
+    return response.data.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};

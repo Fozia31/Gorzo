@@ -50,46 +50,6 @@ const buildAvatar = (username: string) => {
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
 }
 
-// Fallback sample chat queue
-const sampleChatQueue: QueueChatItem[] = [
-  {
-    id: 1,
-    username: "WellnessSeeker",
-    avatar: "WS",
-    lastMessage: "Hello Dr. Amara, I've been experiencing irregular cycles for the past 3 months.",
-    lastMessageTime: "2h ago",
-    unread: 2,
-    priority: "high",
-  },
-  {
-    id: 2,
-    username: "BloomingFlower",
-    avatar: "BF",
-    lastMessage: "Thank you for your response. I have another question about...",
-    lastMessageTime: "5h ago",
-    unread: 1,
-    priority: "normal",
-  },
-  {
-    id: 3,
-    username: "HopefulMama",
-    avatar: "HM",
-    lastMessage: "The supplements you recommended are working great!",
-    lastMessageTime: "1d ago",
-    unread: 0,
-    priority: "normal",
-  },
-  {
-    id: 4,
-    username: "StrongSister",
-    avatar: "SS",
-    lastMessage: "I'm feeling much better after following your advice.",
-    lastMessageTime: "2d ago",
-    unread: 0,
-    priority: "normal",
-  },
-]
-
 function ChatView({
   chat,
   onBack,
@@ -270,7 +230,7 @@ export default function DoctorChatsPage() {
   const { user } = useAuth()
   const userId = user?.id
   const [doctorRecordId, setDoctorRecordId] = useState<string>("")
-  const [chatQueue, setChatQueue] = useState<QueueChatItem[]>(sampleChatQueue)
+  const [chatQueue, setChatQueue] = useState<QueueChatItem[]>([])
   const [selectedChat, setSelectedChat] = useState<QueueChatItem | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoadingQueue, setIsLoadingQueue] = useState(false)
@@ -315,7 +275,7 @@ export default function DoctorChatsPage() {
           setChatQueue([])
         }
       } catch {
-        setChatQueue(sampleChatQueue)
+        setChatQueue([])
       } finally {
         setIsLoadingQueue(false)
       }
@@ -339,7 +299,7 @@ export default function DoctorChatsPage() {
         const mapped = data.map((item: any) => ({
           id: item._id,
           sender: item.senderRole === "Doctor" ? "doctor" : "user",
-          content: item.messageType === "voice" ? "Voice note" : item.messageText,
+          content: item.messageType === "voice" ? "Insight" : item.messageText,
           time: new Date(item.createdAt).toLocaleString(),
           messageType: item.messageType,
           voiceUrl: item.voiceUrl,
