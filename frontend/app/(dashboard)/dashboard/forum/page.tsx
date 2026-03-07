@@ -150,7 +150,7 @@ export default function ForumPage() {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="font-serif text-2xl font-semibold text-foreground md:text-3xl">
-            Posts
+            Discuss with Sisters
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             A safe space to share, ask, and support each other

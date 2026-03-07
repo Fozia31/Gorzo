@@ -14,7 +14,7 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: 'Gorzo - Premium Women\'s Health Platform',
+  title: 'EFOY - Premium Women\'s Health Platform',
   description: 'Your private, trusted companion for women\'s health. Access anonymous forums, expert knowledge, and personalized consulting.',
   generator: 'v0.app',
   icons: {

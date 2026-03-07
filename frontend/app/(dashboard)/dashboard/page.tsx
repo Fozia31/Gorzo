@@ -124,7 +124,7 @@ export default function DashboardPage() {
               <div className="mb-2 rounded-full bg-primary/10 p-3 transition-colors group-hover:bg-primary/20">
                 <Heart className="h-5 w-5 text-primary" />
               </div>
-              <span className="text-sm font-medium">Posts</span>
+              <span className="text-sm font-medium text-center text-xs">Discuss with Sisters</span>
             </CardContent>
           </Card>
         </Link>
@@ -148,13 +148,13 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </Link>
-        <Link href="/dashboard/forum">
-          <Card className="group cursor-pointer transition-all hover:border-muted-foreground/30 hover:shadow-md">
+        <Link href="/dashboard/chatbot">
+          <Card className="group cursor-pointer transition-all hover:border-primary/50 hover:shadow-md">
             <CardContent className="flex flex-col items-center justify-center p-4">
-              <div className="mb-2 rounded-full bg-muted p-3 transition-colors group-hover:bg-muted/80">
-                <MessageSquare className="h-5 w-5 text-muted-foreground" />
+              <div className="mb-2 rounded-full bg-primary/10 p-3 transition-colors group-hover:bg-primary/20">
+                <MessageSquare className="h-5 w-5 text-primary" />
               </div>
-              <span className="text-sm font-medium">Ask Community</span>
+              <span className="text-sm font-medium">Ask EFOY</span>
             </CardContent>
           </Card>
         </Link>
