@@ -84,13 +84,44 @@ module.exports = {
 		// Gemini API integration using axios
 		const axios = require("axios");
 		const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+		if (!GEMINI_API_KEY) {
+			throw new ApiError(500, "Missing GEMINI_API_KEY");
+		}
+
+		const envModel = process.env.GEMINI_MODEL;
+		const modelCandidates = [
+			envModel,
+			"gemini-2.0-flash",
+			"gemini-1.5-flash",
+			"gemini-1.5-flash-latest",
+		].filter(Boolean);
+
 		let geminiResponse = "";
 		try {
-			const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta1/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
-			const apiRes = await axios.post(geminiApiUrl, {
-				contents: [{ parts: [{ text: customPrompt }] }]
-			});
-			geminiResponse = apiRes.data?.candidates?.[0]?.content?.parts?.[0]?.text || "No response from Gemini.";
+			let apiRes = null;
+			let lastError = null;
+
+			for (const model of modelCandidates) {
+				try {
+					const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+					apiRes = await axios.post(geminiApiUrl, {
+						contents: [{ parts: [{ text: customPrompt }] }],
+					});
+					break;
+				} catch (modelErr) {
+					lastError = modelErr;
+					if (modelErr.response?.status !== 404) {
+						throw modelErr;
+					}
+				}
+			}
+
+			if (!apiRes) {
+				throw lastError || new Error("No valid Gemini model found");
+			}
+
+			geminiResponse =
+				apiRes.data?.candidates?.[0]?.content?.parts?.[0]?.text || "No response from Gemini.";
 		} catch (err) {
 			geminiResponse = "Gemini API error: " + (err.response?.data?.error?.message || err.message);
 		}
