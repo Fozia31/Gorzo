@@ -45,6 +45,11 @@ const postSchema = new mongoose.Schema(
 			min: 0,
 			default: 0,
 		},
+		reposts: {
+			type: Number,
+			min: 0,
+			default: 0,
+		},
 		tags: {
 			type: [String],
 			default: [],

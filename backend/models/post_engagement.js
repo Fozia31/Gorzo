@@ -17,7 +17,7 @@ const postEngagementSchema = new mongoose.Schema(
 		type: {
 			type: String,
 			required: true,
-			enum: ["Like", "Report"],
+			enum: ["Like", "Repost", "Report"],
 		},
 		reportReason: {
 			type: String,

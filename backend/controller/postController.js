@@ -45,6 +45,30 @@ const getPosts = asyncHandler(async (req, res) => {
 	});
 });
 
+const getModerationQueue = asyncHandler(async (req, res) => {
+	const threshold = Math.max(Number(req.query.threshold) || 5, 0);
+	const page = Math.max(Number(req.query.page) || 1, 1);
+	const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
+	const skip = (page - 1) * limit;
+
+	const filter = { reports: { $gt: threshold } };
+
+	const [items, total] = await Promise.all([
+		Post.find(filter)
+			.sort({ reports: -1, createdAt: -1 })
+			.skip(skip)
+			.limit(limit)
+			.populate("userId", "displayName"),
+		Post.countDocuments(filter),
+	]);
+
+	return res.status(200).json({
+		success: true,
+		data: items,
+		pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+	});
+});
+
 const getPostById = asyncHandler(async (req, res) => {
 	const postId = req.params.postId || req.params.id;
 	ensureValidObjectId(postId, "post id");
@@ -80,6 +104,7 @@ const deletePost = asyncHandler(async (req, res) => {
 module.exports = {
 	createPost,
 	getPosts,
+	getModerationQueue,
 	getPostById,
 	updatePost,
 	deletePost,
