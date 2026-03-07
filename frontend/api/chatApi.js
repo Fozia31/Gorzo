@@ -30,3 +30,8 @@ export async function getOrCreateDoctorChat({ doctorId, userId }) {
   const created = await api.post("/chats", { doctorId, userId });
   return created.data?.data;
 }
+
+export async function getChats(params = {}) {
+  const res = await api.get("/chats", { params });
+  return res.data?.data || [];
+}
