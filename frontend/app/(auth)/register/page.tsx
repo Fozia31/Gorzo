@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
+import { useAuth } from "@/lib/auth-context"
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -23,26 +24,43 @@ export default function RegisterPage() {
     confirmPassword: "",
   })
 
+  const { register } = useAuth()
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (formData.password !== formData.confirmPassword) {
       alert("Passwords do not match")
       return
     }
-    
+
     if (!acceptedTerms) {
       alert("Please accept the terms and conditions")
       return
     }
-    
+
     setIsLoading(true)
-    
-    // Simulate registration
-    setTimeout(() => {
-      setIsLoading(false)
+
+    try {
+      await register({
+        displayName: formData.username,
+        email: formData.email,
+        password: formData.password,
+      })
       router.push("/dashboard")
-    }, 1500)
+    } catch (err: any) {
+      // Next.js dev mode surfaces `console.error` as an overlay, which is why
+      // you're seeing the `createConsoleError` stack in the browser. The error
+      // itself is coming from the API call (e.g. CORS, network issue, or a
+      // duplicate‑email response).
+      console.error("Registration error", err)
+      // derive a human‑readable message
+      const msg =
+        err?.message || (typeof err === "string" ? err : "Failed to register")
+      alert(msg)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (

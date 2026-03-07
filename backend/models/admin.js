@@ -2,44 +2,27 @@ const mongoose = require("mongoose");
 
 const adminSchema = new mongoose.Schema(
 	{
-		admin_id: {
-			type: String,
+		userId: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: "User",
+			required: true,
 			unique: true,
 			index: true,
-			default: () => new mongoose.Types.ObjectId().toString(),
 		},
-		full_name: {
+		createdDoctorsCount: {
+			type: Number,
+			default: 0,
+			min: 0,
+		},
+		department: {
 			type: String,
-			required: true,
 			trim: true,
-			maxlength: 80,
-		},
-		email: {
-			type: String,
-			required: true,
-			unique: true,
-			trim: true,
-			lowercase: true,
-		},
-		password_hash: {
-			type: String,
-			required: true,
-			minlength: 8,
-		},
-		role: {
-			type: String,
-			enum: ["admin"],
-			default: "admin",
+			default: "",
 		},
 	},
 	{
-		timestamps: {
-			createdAt: "created_at",
-			updatedAt: "updated_at",
-		},
+		timestamps: true,
 	}
 );
-
-adminSchema.index({ email: 1 });
 
 module.exports = mongoose.model("Admin", adminSchema);

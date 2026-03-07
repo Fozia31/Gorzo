@@ -2,66 +2,35 @@ const mongoose = require("mongoose");
 
 const personalAssistanceSchema = new mongoose.Schema(
 	{
-		question_id: {
-			type: String,
-			unique: true,
+		userId: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: "User",
+			required: true,
 			index: true,
-			default: () => new mongoose.Types.ObjectId().toString(),
 		},
-		display_name: {
+		prompt: {
 			type: String,
+			required: true,
 			trim: true,
-			maxlength: 60,
-			default: "Anonymous User",
+			maxlength: 3000,
+		},
+		summaryResponse: {
+			type: String,
+			required: true,
+			trim: true,
+			maxlength: 5000,
 		},
 		category: {
 			type: String,
-			required: true,
 			trim: true,
-			enum: [
-				"menstrual health",
-				"contraception",
-				"pregnancy",
-				"stis",
-				"fertility",
-				"mental health",
-				"sexual wellness",
-				"general",
-			],
 			default: "general",
-		},
-		question: {
-			type: String,
-			required: true,
-			trim: true,
-			minlength: 5,
-			maxlength: 2000,
-		},
-		response: {
-			type: String,
-			trim: true,
-			maxlength: 3000,
-			default:
-				"Thank you for your question. This is a demo guidance response from a doctor. Please consult a licensed healthcare professional for personalized medical advice.",
-		},
-		is_answered: {
-			type: Boolean,
-			default: false,
-		},
-		status: {
-			type: String,
-			enum: ["active", "archived"],
-			default: "active",
 		},
 	},
 	{
-		timestamps: {
-			createdAt: "created_at",
-			updatedAt: "updated_at",
-		},
+		timestamps: true,
 	}
 );
 
-personalAssistanceSchema.index({ category: 1, is_answered: 1, created_at: -1 });
+personalAssistanceSchema.index({ userId: 1, createdAt: -1 });
 
 module.exports = mongoose.model("PersonalAssistance", personalAssistanceSchema);

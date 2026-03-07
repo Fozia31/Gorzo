@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -15,10 +15,8 @@ import {
   Mic, 
   Clock,
   User,
-  Filter,
   Headphones
 } from "lucide-react"
-import { cn } from "@/lib/utils"
 
 // Sample articles
 const articles = [
@@ -35,6 +33,7 @@ const articles = [
     readTime: "8 min",
     hasVoiceNote: true,
     voiceDuration: "4:32",
+    audioUrl: "/audio/hormonal-cycle.mp3",
     publishedAt: "2 days ago",
     featured: true,
   },
@@ -51,6 +50,7 @@ const articles = [
     readTime: "6 min",
     hasVoiceNote: true,
     voiceDuration: "3:15",
+    audioUrl: "/audio/nutrition-cycle.mp3",
     publishedAt: "4 days ago",
     featured: true,
   },
@@ -82,6 +82,7 @@ const articles = [
     readTime: "10 min",
     hasVoiceNote: true,
     voiceDuration: "6:45",
+    audioUrl: "/audio/pcos-symptoms.mp3",
     publishedAt: "1 week ago",
     featured: false,
   },
@@ -98,6 +99,7 @@ const articles = [
     readTime: "7 min",
     hasVoiceNote: true,
     voiceDuration: "4:10",
+    audioUrl: "/audio/sleep-hormones.mp3",
     publishedAt: "2 weeks ago",
     featured: false,
   },
@@ -111,12 +113,38 @@ export default function KnowledgeHubPage() {
   const [playingAudio, setPlayingAudio] = useState<number | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
+  const getAudioUrl = (articleId: number) =>
+    articles.find((article) => article.id === articleId)?.audioUrl || ""
+
   const toggleAudio = (articleId: number) => {
     if (playingAudio === articleId) {
       setPlayingAudio(null)
     } else {
       setPlayingAudio(articleId)
     }
+  }
+
+  // when playingAudio changes, update the <audio> element
+  useEffect(() => {
+    if (!audioRef.current) return
+    if (playingAudio === null) {
+      audioRef.current.pause()
+      audioRef.current.currentTime = 0
+    } else {
+      const audioUrl = getAudioUrl(playingAudio)
+      if (audioUrl) {
+        audioRef.current.src = audioUrl
+        audioRef.current.play().catch(err => {
+          console.error("audio play failed", err)
+        })
+      } else {
+        setPlayingAudio(null)
+      }
+    }
+  }, [playingAudio])
+
+  const handleAudioEnded = () => {
+    setPlayingAudio(null)
   }
 
   const filteredArticles = articles.filter(article => {
@@ -313,6 +341,8 @@ export default function KnowledgeHubPage() {
           </CardContent>
         </Card>
       )}
+      {/* hidden audio element for playback */}
+      <audio ref={audioRef} onEnded={handleAudioEnded} className="hidden" />
     </div>
   )
 }

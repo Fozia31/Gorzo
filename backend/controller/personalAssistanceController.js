@@ -1,85 +1,71 @@
 const PersonalAssistance = require("../models/personal_assistance");
+const asyncHandler = require("../utiles/asyncHandler");
+const ApiError = require("../utiles/apiError");
+const { ensureRequiredFields, ensureValidObjectId } = require("../utiles/validation");
 
-const createQuestion = async (req, res) => {
-	try {
-		const { display_name, category, question, response, is_answered } = req.body;
+const createQuestion = asyncHandler(async (req, res) => {
+	ensureRequiredFields(req.body, ["userId", "prompt", "summaryResponse"]);
+	ensureValidObjectId(req.body.userId, "userId");
 
-		if (!category || !question) {
-			return res.status(400).json({
-				success: false,
-				message: "category and question are required",
-			});
-		}
+	const item = await PersonalAssistance.create({
+		userId: req.body.userId,
+		prompt: req.body.prompt,
+		summaryResponse: req.body.summaryResponse,
+		category: req.body.category || "general",
+	});
 
-		const payload = {
-			display_name,
-			category,
-			question,
-		};
+	return res.status(201).json({ success: true, message: "AI assistance saved", data: item });
+});
 
-		if (typeof response === "string") {
-			payload.response = response;
-		}
-		if (typeof is_answered === "boolean") {
-			payload.is_answered = is_answered;
-		}
-
-		const item = await PersonalAssistance.create(payload);
-
-		return res.status(201).json({
-			success: true,
-			message: "Question submitted successfully",
-			data: item,
-		});
-	} catch (error) {
-		return res.status(500).json({
-			success: false,
-			message: error.message || "Failed to submit question",
-		});
+const getQuestions = asyncHandler(async (req, res) => {
+	const filter = {};
+	if (req.query.userId) {
+		ensureValidObjectId(req.query.userId, "userId");
+		filter.userId = req.query.userId;
 	}
-};
+	if (req.query.category) filter.category = req.query.category;
 
-const getQuestions = async (req, res) => {
-	try {
-		const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-		const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 50);
-		const skip = (page - 1) * limit;
+	const items = await PersonalAssistance.find(filter).sort({ createdAt: -1 });
+	return res.status(200).json({ success: true, data: items });
+});
 
-		const filter = { status: "active" };
-		if (req.query.category) {
-			filter.category = req.query.category;
-		}
-		if (typeof req.query.is_answered === "string") {
-			filter.is_answered = req.query.is_answered.toLowerCase() === "true";
-		}
+const getQuestionById = asyncHandler(async (req, res) => {
+	const assistanceId = req.params.assistanceId || req.params.id;
+	ensureValidObjectId(assistanceId, "assistance id");
+	const item = await PersonalAssistance.findById(assistanceId);
+	if (!item) throw new ApiError(404, "Assistance record not found");
+	return res.status(200).json({ success: true, data: item });
+});
 
-		const [items, total] = await Promise.all([
-			PersonalAssistance.find(filter)
-				.sort({ created_at: -1 })
-				.skip(skip)
-				.limit(limit),
-			PersonalAssistance.countDocuments(filter),
-		]);
+const updateQuestion = asyncHandler(async (req, res) => {
+	const assistanceId = req.params.assistanceId || req.params.id;
+	ensureValidObjectId(assistanceId, "assistance id");
+	const payload = {};
+	if (req.body.prompt !== undefined) payload.prompt = req.body.prompt;
+	if (req.body.summaryResponse !== undefined) payload.summaryResponse = req.body.summaryResponse;
+	if (req.body.category !== undefined) payload.category = req.body.category;
+	if (Object.keys(payload).length === 0) throw new ApiError(400, "No valid fields to update");
 
-		return res.status(200).json({
-			success: true,
-			data: items,
-			pagination: {
-				page,
-				limit,
-				total,
-				total_pages: Math.ceil(total / limit),
-			},
-		});
-	} catch (error) {
-		return res.status(500).json({
-			success: false,
-			message: error.message || "Failed to fetch questions",
-		});
-	}
-};
+	const updated = await PersonalAssistance.findByIdAndUpdate(assistanceId, payload, {
+		new: true,
+		runValidators: true,
+	});
+	if (!updated) throw new ApiError(404, "Assistance record not found");
+	return res.status(200).json({ success: true, message: "Assistance updated", data: updated });
+});
+
+const deleteQuestion = asyncHandler(async (req, res) => {
+	const assistanceId = req.params.assistanceId || req.params.id;
+	ensureValidObjectId(assistanceId, "assistance id");
+	const deleted = await PersonalAssistance.findByIdAndDelete(assistanceId);
+	if (!deleted) throw new ApiError(404, "Assistance record not found");
+	return res.status(200).json({ success: true, message: "Assistance deleted" });
+});
 
 module.exports = {
 	createQuestion,
 	getQuestions,
+	getQuestionById,
+	updateQuestion,
+	deleteQuestion,
 };

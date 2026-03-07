@@ -2,27 +2,28 @@ const mongoose = require("mongoose");
 
 const commentSchema = new mongoose.Schema(
 	{
+		// legacy index for comments created earlier – keep field to satisfy DB
 		comment_id: {
 			type: String,
-			unique: true,
-			index: true,
 			default: () => new mongoose.Types.ObjectId().toString(),
 		},
-		post_id: {
-			type: String,
+		postId: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: "Post",
 			required: true,
 			index: true,
 		},
-		user_id: {
+		userId: {
 			type: mongoose.Schema.Types.ObjectId,
 			ref: "User",
-			default: null,
+			required: true,
+			index: true,
 		},
-		display_name: {
+		displayName: {
 			type: String,
+			required: true,
 			trim: true,
 			maxlength: 60,
-			default: null,
 		},
 		content: {
 			type: String,
@@ -31,24 +32,17 @@ const commentSchema = new mongoose.Schema(
 			minlength: 1,
 			maxlength: 1000,
 		},
-		is_anonymous: {
+		isReported: {
 			type: Boolean,
 			default: false,
 		},
-		status: {
-			type: String,
-			enum: ["active", "hidden", "deleted"],
-			default: "active",
-		},
 	},
+
 	{
-		timestamps: {
-			createdAt: "created_at",
-			updatedAt: "updated_at",
-		},
+		timestamps: true,
 	}
 );
 
-commentSchema.index({ post_id: 1, created_at: 1 });
+commentSchema.index({ postId: 1, createdAt: 1 });
 
 module.exports = mongoose.model("Comment", commentSchema);
