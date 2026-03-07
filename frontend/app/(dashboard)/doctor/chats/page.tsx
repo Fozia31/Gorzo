@@ -1,11 +1,15 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { useAuth } from "@/lib/auth-context"
+import { getDoctorChatQueue } from "@/api/chatApi"
+import { getDoctorByUserId } from "@/api/doctorApi"
+import { getMessagesByChat, markChatMessagesRead, sendMessage } from "@/api/messageApi"
 import { 
   MessageCircle,
   Send,
@@ -17,8 +21,35 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-// Sample chat queue
-const chatQueue = [
+type QueueChatItem = {
+  id: string | number
+  chatId?: string
+  username: string
+  avatar?: string
+  lastMessage: string
+  lastMessageTime: string
+  unread: number
+  priority: "high" | "normal"
+}
+
+type ChatMessage = {
+  id: string | number
+  sender: "user" | "doctor"
+  content: string
+  time: string
+  messageType?: "text" | "voice"
+  voiceUrl?: string
+}
+
+const buildAvatar = (username: string) => {
+  const parts = username.trim().split(" ").filter(Boolean)
+  if (parts.length === 0) return "U"
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+}
+
+// Fallback sample chat queue
+const sampleChatQueue: QueueChatItem[] = [
   {
     id: 1,
     username: "WellnessSeeker",
@@ -57,34 +88,24 @@ const chatQueue = [
   },
 ]
 
-function ChatView({ chat, onBack }: { chat: typeof chatQueue[0], onBack: () => void }) {
+function ChatView({
+  chat,
+  messages,
+  onBack,
+  onSend,
+  isSending,
+}: {
+  chat: QueueChatItem
+  messages: ChatMessage[]
+  onBack: () => void
+  onSend: (text: string) => Promise<void>
+  isSending: boolean
+}) {
   const [message, setMessage] = useState("")
-  
-  // Sample messages
-  const messages = [
-    {
-      id: 1,
-      sender: "user",
-      content: "Hello Dr. Amara, I've been experiencing irregular cycles for the past 3 months.",
-      time: "Yesterday, 10:30 AM"
-    },
-    {
-      id: 2,
-      sender: "doctor",
-      content: "Hello! Thank you for reaching out. Irregular cycles can have various causes. Can you tell me more about your symptoms? Are you experiencing any pain, unusual discharge, or other changes?",
-      time: "Yesterday, 11:45 AM"
-    },
-    {
-      id: 3,
-      sender: "user",
-      content: "No pain, but I've noticed some weight changes and mood swings.",
-      time: "Yesterday, 2:00 PM"
-    },
-  ]
 
-  const handleSend = () => {
-    if (message.trim()) {
-      // In real app, this would send the message
+  const handleSend = async () => {
+    if (message.trim() && !isSending) {
+      await onSend(message.trim())
       setMessage("")
     }
   }
@@ -150,10 +171,11 @@ function ChatView({ chat, onBack }: { chat: typeof chatQueue[0], onBack: () => v
             placeholder="Type your response..."
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            onKeyDown={(e) => e.key === "Enter" && void handleSend()}
             className="flex-1"
+            disabled={isSending}
           />
-          <Button onClick={handleSend} disabled={!message.trim()}>
+          <Button onClick={() => void handleSend()} disabled={!message.trim() || isSending}>
             <Send className="h-4 w-4" />
           </Button>
         </div>
@@ -163,18 +185,141 @@ function ChatView({ chat, onBack }: { chat: typeof chatQueue[0], onBack: () => v
 }
 
 export default function DoctorChatsPage() {
-  const [selectedChat, setSelectedChat] = useState<typeof chatQueue[0] | null>(null)
+  const { user } = useAuth()
+  const userId = user?.id
+  const [doctorRecordId, setDoctorRecordId] = useState<string>("")
+  const [chatQueue, setChatQueue] = useState<QueueChatItem[]>(sampleChatQueue)
+  const [selectedChat, setSelectedChat] = useState<QueueChatItem | null>(null)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [isLoadingQueue, setIsLoadingQueue] = useState(false)
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false)
+  const [isSending, setIsSending] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
 
-  const filteredChats = chatQueue.filter(chat => 
-    chat.username.toLowerCase().includes(searchQuery.toLowerCase())
+  useEffect(() => {
+    const loadDoctorRecordId = async () => {
+      if (!userId) return
+      try {
+        const doctor = await getDoctorByUserId(userId)
+        if (doctor?._id) setDoctorRecordId(String(doctor._id))
+      } catch {
+        setDoctorRecordId("")
+      }
+    }
+
+    void loadDoctorRecordId()
+  }, [userId])
+
+  useEffect(() => {
+    const loadQueue = async () => {
+      if (!doctorRecordId) return
+      setIsLoadingQueue(true)
+      try {
+        const queue = await getDoctorChatQueue(doctorRecordId)
+        if (Array.isArray(queue) && queue.length > 0) {
+          setChatQueue(
+            queue.map((item) => ({
+              id: item.id,
+              chatId: item.chatId,
+              username: item.username,
+              avatar: buildAvatar(item.username),
+              lastMessage: item.lastMessage || "",
+              lastMessageTime: item.lastMessageTime || "N/A",
+              unread: Number(item.unread || 0),
+              priority: item.priority === "high" ? "high" : "normal",
+            }))
+          )
+        } else {
+          setChatQueue([])
+        }
+      } catch {
+        setChatQueue(sampleChatQueue)
+      } finally {
+        setIsLoadingQueue(false)
+      }
+    }
+
+    void loadQueue()
+  }, [doctorRecordId])
+
+  useEffect(() => {
+    const loadMessages = async () => {
+      if (!selectedChat?.chatId) {
+        setMessages([])
+        return
+      }
+
+      setIsLoadingMessages(true)
+      try {
+        const response = await getMessagesByChat(selectedChat.chatId)
+        const data = Array.isArray(response?.data) ? response.data : []
+
+        const mapped = data.map((item: any) => ({
+          id: item._id,
+          sender: item.senderRole === "Doctor" ? "doctor" : "user",
+          content: item.messageType === "voice" ? "Voice note" : item.messageText,
+          time: new Date(item.createdAt).toLocaleString(),
+          messageType: item.messageType,
+          voiceUrl: item.voiceUrl,
+        }))
+        setMessages(mapped)
+        await markChatMessagesRead(selectedChat.chatId, "Doctor")
+      } catch {
+        setMessages([])
+      } finally {
+        setIsLoadingMessages(false)
+      }
+    }
+
+    void loadMessages()
+  }, [selectedChat])
+
+  const filteredChats = useMemo(
+    () => chatQueue.filter((chat) => chat.username.toLowerCase().includes(searchQuery.toLowerCase())),
+    [chatQueue, searchQuery]
   )
 
   const pendingChats = filteredChats.filter(c => c.unread > 0)
   const resolvedChats = filteredChats.filter(c => c.unread === 0)
 
+  const handleSendMessage = async (text: string) => {
+    if (!selectedChat?.chatId || !userId) return
+
+    setIsSending(true)
+    try {
+      const sent = await sendMessage({
+        chatId: selectedChat.chatId,
+        senderId: userId,
+        senderRole: "Doctor",
+        messageType: "text",
+        messageText: text,
+      })
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: sent?._id || `${Date.now()}`,
+          sender: "doctor",
+          content: text,
+          time: sent?.createdAt ? new Date(sent.createdAt).toLocaleString() : "Just now",
+          messageType: "text",
+        },
+      ])
+    } finally {
+      setIsSending(false)
+    }
+  }
+
   if (selectedChat) {
-    return <ChatView chat={selectedChat} onBack={() => setSelectedChat(null)} />
+    return (
+      <ChatView
+        chat={selectedChat}
+        messages={isLoadingMessages ? [] : messages}
+        onBack={() => setSelectedChat(null)}
+        onSend={handleSendMessage}
+        isSending={isSending}
+      />
+    )
   }
 
   return (
@@ -188,6 +333,10 @@ export default function DoctorChatsPage() {
           Private consultations with premium members
         </p>
       </div>
+
+      {isLoadingQueue && (
+        <p className="text-sm text-muted-foreground">Loading conversations...</p>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
@@ -208,7 +357,7 @@ export default function DoctorChatsPage() {
               <Clock className="h-4 w-4 text-secondary-foreground" />
             </div>
             <div>
-              <p className="text-xl font-semibold">2.5h</p>
+              <p className="text-xl font-semibold">-</p>
               <p className="text-xs text-muted-foreground">Avg Response</p>
             </div>
           </CardContent>

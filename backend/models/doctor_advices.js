@@ -22,7 +22,8 @@ const doctorAdviceSchema = new mongoose.Schema(
 		contentType: {
 			type: String,
 			required: true,
-			enum: ["Text", "VoiceURL"],
+			enum: ["Text", "VoiceURL", "Mixed"],
+			default: "Text",
 		},
 		textContent: {
 			type: String,
@@ -48,11 +49,21 @@ const doctorAdviceSchema = new mongoose.Schema(
 			type: Boolean,
 			default: true,
 		},
+		status: {
+			type: String,
+			enum: ["draft", "published"],
+			default: "published",
+		},
 		summary: {
 			type: String,
 			trim: true,
 			maxlength: 500,
 			default: "",
+		},
+		viewsCount: {
+			type: Number,
+			min: 0,
+			default: 0,
 		},
 	},
 	{
@@ -62,5 +73,6 @@ const doctorAdviceSchema = new mongoose.Schema(
 
 doctorAdviceSchema.index({ doctorId: 1, createdAt: -1 });
 doctorAdviceSchema.index({ category: 1, contentType: 1 });
+doctorAdviceSchema.index({ doctorId: 1, status: 1, createdAt: -1 });
 
 module.exports = mongoose.model("DoctorAdvice", doctorAdviceSchema);

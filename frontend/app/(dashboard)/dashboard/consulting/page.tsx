@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { useAuth } from "@/lib/auth-context"
+import { getDoctorRatings, getDoctorRatingStats, getDoctors, submitDoctorRating } from "@/api/doctorApi"
 import { 
   Crown,
   MessageCircle,
@@ -160,6 +161,102 @@ const doctors = [
     ]
   },
 ]
+
+const availabilityDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const
+
+const emptyAvailability = {
+  Monday: { enabled: false, slots: [] },
+  Tuesday: { enabled: false, slots: [] },
+  Wednesday: { enabled: false, slots: [] },
+  Thursday: { enabled: false, slots: [] },
+  Friday: { enabled: false, slots: [] },
+  Saturday: { enabled: false, slots: [] },
+  Sunday: { enabled: false, slots: [] },
+}
+
+const normalizeDoctorName = (name: string) =>
+  name.replace(/^dr\.?\s*/i, "").trim().toLowerCase()
+
+const toAvailabilityRecord = (items: Array<{ day: string; enabled: boolean; slots: { start: string; end: string }[] }>) => {
+  const record = { ...emptyAvailability }
+  for (const item of items || []) {
+    if (record[item.day as keyof typeof record]) {
+      record[item.day as keyof typeof record] = {
+        enabled: Boolean(item.enabled),
+        slots: Array.isArray(item.slots) ? item.slots : [],
+      }
+    }
+  }
+  return record
+}
+
+const hasAnyAvailability = (availability: typeof doctors[0]["availability"]) =>
+  availabilityDays.some((day) => availability[day].enabled && availability[day].slots.length > 0)
+
+const mapBackendDoctorsToUi = (backendDoctors: any[]) => {
+  return backendDoctors.map((item: any, index: number) => {
+    const displayName = item?.userId?.displayName || "Doctor"
+    const specialty = item?.specialization || "General Practitioner"
+    const matchedSample = doctors.find((sample) => {
+      const sampleName = normalizeDoctorName(sample.name)
+      const backendName = normalizeDoctorName(displayName)
+      if (sampleName && backendName && sampleName === backendName) return true
+      return sample.specialty.toLowerCase() === String(specialty).toLowerCase()
+    })
+
+    const availability = Array.isArray(item?.availability)
+      ? toAvailabilityRecord(item.availability)
+      : matchedSample?.availability || { ...emptyAvailability }
+    const available = hasAnyAvailability(availability)
+
+    return {
+      id: index + 1,
+      doctorRecordId: String(item?._id || ""),
+      userId: String(item?.userId?._id || ""),
+      name: displayName,
+      specialty,
+      avatar: item?.userId?.avatar || matchedSample?.avatar || "/doctors/placeholder.jpg",
+      // Do not use sample rating totals here. Real values are hydrated from backend stats.
+      rating: 0,
+      totalReviews: 0,
+      available,
+      responseTime: available ? (matchedSample?.responseTime || "Usually responds in a few hours") : "Currently unavailable",
+      experience: matchedSample?.experience || (item?.createdAt ? `${Math.max(new Date().getFullYear() - new Date(item.createdAt).getFullYear(), 1)} years` : "N/A"),
+      bio: item?.bio || matchedSample?.bio || "No bio provided yet.",
+      consultationFee: matchedSample?.consultationFee || 299,
+      availability,
+      reviews: [],
+    }
+  })
+}
+
+const mapBackendReviewDate = (dateValue: string | Date | undefined) => {
+  if (!dateValue) return "recently"
+  const date = new Date(dateValue)
+  const diffMs = Date.now() - date.getTime()
+  const minutes = Math.floor(diffMs / (1000 * 60))
+  if (minutes < 1) return "just now"
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  if (days < 30) return `${days} day${days > 1 ? "s" : ""} ago`
+  const months = Math.floor(days / 30)
+  return `${months} month${months > 1 ? "s" : ""} ago`
+}
+
+const REVIEWS_PAGE_SIZE = 5
+
+const mapRatingsToReviews = (items: any[], doctorId: string | number) =>
+  Array.isArray(items)
+    ? items.map((item: any, index: number) => ({
+        id: item.id || `${doctorId}-${index}`,
+        user: item.user || "Anonymous User",
+        rating: Number(item.rating || 0),
+        comment: item.comment || "",
+        date: mapBackendReviewDate(item.date),
+      }))
+    : []
 
 // Chat Room type
 type ChatRoom = {
@@ -364,11 +461,17 @@ function DoctorProfileView({
   onBack, 
   onContact,
   hasPaidAccess,
+  onLoadMoreReviews,
+  canLoadMoreReviews,
+  isLoadingReviews,
 }: { 
   doctor: typeof doctors[0]
   onBack: () => void
   onContact: () => void
   hasPaidAccess: boolean
+  onLoadMoreReviews: () => void
+  canLoadMoreReviews: boolean
+  isLoadingReviews: boolean
 }) {
   const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
   const shortDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -540,8 +643,15 @@ function DoctorProfileView({
             </Card>
           ))}
         </div>
+        {canLoadMoreReviews ? (
+          <div className="flex justify-center">
+            <Button variant="outline" onClick={onLoadMoreReviews} disabled={isLoadingReviews}>
+              {isLoadingReviews ? "Loading..." : "Load More Reviews"}
+            </Button>
+          </div>
+        ) : null}
         <p className="text-center text-sm text-muted-foreground">
-          Showing top 3 reviews. Contact doctor to see all reviews.
+          {doctor.reviews.length > 0 ? "Showing real reviews from patients." : "No reviews yet for this doctor."}
         </p>
       </div>
     </div>
@@ -793,12 +903,16 @@ function ChatRoomView({
 // Main Consulting Page
 export default function ConsultingPage() {
   const { user } = useAuth()
+  const [doctorsList, setDoctorsList] = useState(doctors)
   
   const [view, setView] = useState<"list" | "profile" | "chat">("list")
   const [selectedDoctor, setSelectedDoctor] = useState<typeof doctors[0] | null>(null)
   const [selectedChatRoom, setSelectedChatRoom] = useState<ChatRoom | null>(null)
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const [showRatingDialog, setShowRatingDialog] = useState(false)
+  const [reviewPage, setReviewPage] = useState(1)
+  const [reviewTotalPages, setReviewTotalPages] = useState(1)
+  const [isLoadingReviews, setIsLoadingReviews] = useState(false)
   
   // Track which doctors the user has paid for - in real app this would come from database
   const [paidDoctorIds, setPaidDoctorIds] = useState<number[]>([1]) // Demo: already paid for Dr. Amara
@@ -839,6 +953,90 @@ export default function ConsultingPage() {
     }
   ])
 
+  const refreshDoctorReviews = async (doctor: any, page = 1, append = false) => {
+    if (!doctor?.doctorRecordId) return
+
+    setIsLoadingReviews(true)
+    try {
+      const [ratingsResponse, stats] = await Promise.all([
+        getDoctorRatings(doctor.doctorRecordId, { limit: REVIEWS_PAGE_SIZE, page }),
+        getDoctorRatingStats(doctor.doctorRecordId),
+      ])
+
+      const incomingReviews = mapRatingsToReviews(ratingsResponse?.data || [], doctor.id)
+      const mergedReviews = append
+        ? [
+            ...(Array.isArray(doctor.reviews) ? doctor.reviews : []),
+            ...incomingReviews.filter(
+              (review: any) => !(Array.isArray(doctor.reviews) ? doctor.reviews : []).some((existing: any) => existing.id === review.id)
+            ),
+          ]
+        : incomingReviews
+
+      const updatedDoctor = {
+        ...doctor,
+        rating: Number(stats?.average || doctor.rating || 0),
+        totalReviews: Number(stats?.total || doctor.totalReviews || 0),
+        reviews: mergedReviews,
+      }
+
+      setReviewPage(Number(page))
+      setReviewTotalPages(Number(ratingsResponse?.pagination?.totalPages || 1))
+      setSelectedDoctor(updatedDoctor)
+      setDoctorsList((prev) => prev.map((item) => (item.id === updatedDoctor.id ? { ...item, rating: updatedDoctor.rating, totalReviews: updatedDoctor.totalReviews, reviews: updatedDoctor.reviews } : item)))
+      setChatRooms((prev) => prev.map((room) => (room.doctor.id === updatedDoctor.id ? { ...room, doctor: { ...room.doctor, rating: updatedDoctor.rating, totalReviews: updatedDoctor.totalReviews, reviews: updatedDoctor.reviews } } : room)))
+    } finally {
+      setIsLoadingReviews(false)
+    }
+  }
+
+  useEffect(() => {
+    const loadDoctorsAvailability = async () => {
+      try {
+        const response = await getDoctors({ limit: 100 })
+        const backendDoctors = Array.isArray(response?.data) ? response.data : []
+        if (backendDoctors.length === 0) return
+
+        const baseDoctors = mapBackendDoctorsToUi(backendDoctors)
+        const uiDoctors = await Promise.all(
+          baseDoctors.map(async (doctor) => {
+            if (!doctor.doctorRecordId) return doctor
+            try {
+              const [ratingsResponse, stats] = await Promise.all([
+                getDoctorRatings(doctor.doctorRecordId, { limit: REVIEWS_PAGE_SIZE, page: 1 }),
+                getDoctorRatingStats(doctor.doctorRecordId),
+              ])
+
+              const reviews = mapRatingsToReviews(ratingsResponse?.data, doctor.id)
+
+              return {
+                ...doctor,
+                rating: Number(stats?.average || doctor.rating || 0),
+                totalReviews: Number(stats?.total || reviews.length || doctor.totalReviews || 0),
+                reviews,
+              }
+            } catch {
+              return doctor
+            }
+          })
+        )
+
+        setDoctorsList(uiDoctors)
+
+        // If selected doctor is open, keep it in sync with the refreshed data.
+        setSelectedDoctor((prev) => {
+          if (!prev) return prev
+          const updated = uiDoctors.find((item) => item.id === prev.id)
+          return updated || prev
+        })
+      } catch {
+        // Keep sample doctors when backend is unavailable.
+      }
+    }
+
+    void loadDoctorsAvailability()
+  }, [])
+
   // Auto-handle payment success
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -846,7 +1044,7 @@ export default function ConsultingPage() {
       const doctorId = params.get("doctor")
       if (doctorId) {
         const docId = parseInt(doctorId)
-        const doctor = doctors.find(d => d.id === docId)
+          const doctor = doctorsList.find(d => d.id === docId)
         if (doctor && !paidDoctorIds.includes(docId)) {
           // Add to paid doctors
           setPaidDoctorIds(prev => [...prev, docId])
@@ -870,13 +1068,16 @@ export default function ConsultingPage() {
       // Clear URL params
       window.history.replaceState({}, '', '/dashboard/consulting')
     }
-  }, [])
+  }, [doctorsList, paidDoctorIds, chatRooms])
 
   const hasPaidForDoctor = (doctorId: number) => paidDoctorIds.includes(doctorId)
 
   const handleDoctorClick = (doctor: typeof doctors[0]) => {
     setSelectedDoctor(doctor)
+    setReviewPage(1)
+    setReviewTotalPages(1)
     setView("profile")
+    void refreshDoctorReviews(doctor, 1, false)
   }
 
   const handleContactDoctor = () => {
@@ -921,9 +1122,27 @@ export default function ConsultingPage() {
     }
   }
 
-  const handleRatingSubmit = (rating: number, comment: string, anonymous: boolean) => {
-    // In real app, this would submit to database
-    console.log("Rating submitted:", { rating, comment, anonymous, doctor: selectedDoctor?.id })
+  const handleRatingSubmit = async (rating: number, comment: string, anonymous: boolean) => {
+    if (!selectedDoctor?.doctorRecordId || !user?.id) return
+
+    try {
+      await submitDoctorRating(selectedDoctor.doctorRecordId, {
+        userId: user.id,
+        rating,
+        comment,
+        anonymous,
+      })
+
+      await refreshDoctorReviews(selectedDoctor, 1, false)
+    } catch {
+      alert("Failed to submit rating. Please try again.")
+    }
+  }
+
+  const handleLoadMoreReviews = () => {
+    if (!selectedDoctor) return
+    if (reviewPage >= reviewTotalPages) return
+    void refreshDoctorReviews(selectedDoctor, reviewPage + 1, true)
   }
 
   const handleClearHistory = () => {
@@ -965,6 +1184,9 @@ export default function ConsultingPage() {
           onBack={handleBack}
           onContact={handleContactDoctor}
           hasPaidAccess={hasPaidForDoctor(selectedDoctor.id)}
+          onLoadMoreReviews={handleLoadMoreReviews}
+          canLoadMoreReviews={reviewPage < reviewTotalPages}
+          isLoadingReviews={isLoadingReviews}
         />
         <PaymentDialog 
           doctor={selectedDoctor}
@@ -1042,7 +1264,7 @@ export default function ConsultingPage() {
           {chatRooms.length > 0 ? "Find More Doctors" : "Available Doctors"}
         </h2>
         <div className="grid gap-4 md:grid-cols-2">
-          {doctors.map((doctor) => {
+          {doctorsList.map((doctor) => {
             const hasPaid = hasPaidForDoctor(doctor.id)
             return (
               <Card 

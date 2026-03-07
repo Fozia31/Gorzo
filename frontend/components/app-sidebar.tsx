@@ -11,6 +11,7 @@ import {
   FileText,
   Mic,
   Inbox,
+  User,
   UserCog,
   Flag,
   LogOut,
@@ -42,7 +43,8 @@ const womanNavItems = [
 ]
 
 const doctorNavItems = [
-  { title: "Info", icon: FileText, href: "/doctor" },
+  { title: "Content Creator", icon: FileText, href: "/doctor" },
+  { title: "Profile", icon: User, href: "/doctor/profile" },
   { title: "Voice Notes", icon: Mic, href: "/doctor/voice-notes" },
   { title: "Premium Chat Queue", icon: Inbox, href: "/doctor/chats" },
 ]

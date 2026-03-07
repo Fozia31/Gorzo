@@ -46,6 +46,7 @@ export default function DoctorLoginPage() {
         email: backendUser.email,
         role: 'doctor' as const,
         tier: backendUser.isPremium ? 'premium' : 'free',
+        avatar: backendUser.avatar || "",
       }
       
       login(frontendUser)

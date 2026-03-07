@@ -19,6 +19,18 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { useAuth } from "@/lib/auth-context"
+import {
+  getDoctorAvailability,
+  getDoctorByUserId,
+  getDoctorDashboardSummary,
+  getDoctorPatients,
+  getDoctorRatingStats,
+  getDoctorRatings,
+  updateDoctorAvailability,
+} from "@/api/doctorApi"
+import { createDoctorAdvice, getDoctorAdviceByDoctor } from "@/api/doctorAdviceApi"
+import { getOrCreateDoctorChat } from "@/api/chatApi"
+import { sendMessage } from "@/api/messageApi"
 import { 
   FileText,
   Mic,
@@ -102,7 +114,7 @@ const samplePatients = [
 ]
 
 // Sample published articles
-const publishedArticles = [
+const samplePublishedArticles = [
   {
     id: 1,
     title: "Understanding Your Hormonal Cycle: A Complete Guide",
@@ -132,7 +144,7 @@ const publishedArticles = [
 const categories = ["Hormones", "Nutrition", "Fertility", "Conditions", "Wellness", "Mental Health"]
 
 // Sample ratings from patients
-const myRatings = [
+const sampleRatings = [
   {
     id: 1,
     user: "Selam123",
@@ -176,7 +188,7 @@ const myRatings = [
 ]
 
 // Rating statistics
-const ratingStats = {
+const sampleRatingStats = {
   average: 4.9,
   total: 156,
   distribution: [
@@ -200,8 +212,11 @@ const timeSlots = [
   "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00"
 ]
 
-// Initial availability
-const initialAvailability = {
+type AvailabilitySlot = { start: string; end: string }
+type AvailabilityDay = { enabled: boolean; slots: AvailabilitySlot[] }
+type AvailabilityRecord = Record<string, AvailabilityDay>
+
+const initialAvailability: AvailabilityRecord = {
   Monday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }, { start: "14:00", end: "17:00" }] },
   Tuesday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }, { start: "14:00", end: "17:00" }] },
   Wednesday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }] },
@@ -211,9 +226,64 @@ const initialAvailability = {
   Sunday: { enabled: false, slots: [] },
 }
 
+const buildAvatar = (username: string) => {
+  const parts = username.trim().split(" ").filter(Boolean)
+  if (parts.length === 0) return "U"
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+}
+
+const toRelativeTime = (dateValue: string | number | Date | undefined) => {
+  if (!dateValue) return "N/A"
+  const date = new Date(dateValue)
+  const diffMs = Date.now() - date.getTime()
+  const minutes = Math.floor(diffMs / (1000 * 60))
+  if (minutes < 1) return "just now"
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
+const availabilityRecordFromApi = (
+  apiAvailability: Array<{ day: string; enabled: boolean; slots: AvailabilitySlot[] }>
+) => {
+  const base: AvailabilityRecord = { ...initialAvailability }
+  for (const item of apiAvailability || []) {
+    if (base[item.day as keyof typeof base]) {
+      base[item.day as keyof typeof base] = {
+        enabled: Boolean(item.enabled),
+        slots: Array.isArray(item.slots) ? item.slots : [],
+      }
+    }
+  }
+  return base
+}
+
+const availabilityPayloadFromRecord = (record: AvailabilityRecord) => {
+  return daysOfWeek.map((day) => ({
+    day,
+    enabled: Boolean(record[day]?.enabled),
+    slots: Array.isArray(record[day]?.slots) ? record[day].slots : [],
+  }))
+}
+
 export default function DoctorDashboardPage() {
   const { user, login } = useAuth()
+  const userId = user?.id
+  const [doctorRecordId, setDoctorRecordId] = useState<string>("")
   const [patients, setPatients] = useState(samplePatients)
+  const [publishedArticles, setPublishedArticles] = useState(samplePublishedArticles)
+  const [myRatings, setMyRatings] = useState(sampleRatings)
+  const [ratingStats, setRatingStats] = useState(sampleRatingStats)
+  const [dashboardSummary, setDashboardSummary] = useState({
+    patients: samplePatients.length,
+    unreadMessages: samplePatients.reduce((acc, p) => acc + p.unreadMessages, 0),
+    publishedArticles: samplePublishedArticles.length,
+    ratingAverage: sampleRatingStats.average,
+    ratingTotal: sampleRatingStats.total,
+  })
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedPatient, setSelectedPatient] = useState<typeof samplePatients[0] | null>(null)
   const [isRecording, setIsRecording] = useState(false)
@@ -227,7 +297,7 @@ export default function DoctorDashboardPage() {
     category: "Hormones",
     content: "",
   })
-  const [availability, setAvailability] = useState<Record<string, { enabled: boolean; slots: { start: string; end: string }[] }>>(initialAvailability)
+  const [availability, setAvailability] = useState<AvailabilityRecord>(initialAvailability)
   const [isSavingAvailability, setIsSavingAvailability] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useState<{ name: string; size: number; type: string }[]>([])
   const [isUploading, setIsUploading] = useState(false)
@@ -246,6 +316,108 @@ export default function DoctorDashboardPage() {
       })
     }
   }, [user, login])
+
+  useEffect(() => {
+    const loadDoctorRecordId = async () => {
+      if (!userId) return
+      try {
+        const doctor = await getDoctorByUserId(userId)
+        if (doctor?._id) setDoctorRecordId(String(doctor._id))
+      } catch {
+        setDoctorRecordId("")
+      }
+    }
+
+    void loadDoctorRecordId()
+  }, [userId])
+
+  useEffect(() => {
+    const loadDashboard = async () => {
+      if (!doctorRecordId) return
+
+      try {
+        const [summary, patientsResponse, apiAvailability, stats, ratingsResponse, adviceItems] = await Promise.all([
+          getDoctorDashboardSummary(doctorRecordId),
+          getDoctorPatients(doctorRecordId, { limit: 100 }),
+          getDoctorAvailability(doctorRecordId),
+          getDoctorRatingStats(doctorRecordId),
+          getDoctorRatings(doctorRecordId, { limit: 20 }),
+          getDoctorAdviceByDoctor(doctorRecordId, { status: "published" }),
+        ])
+
+        setDashboardSummary({
+          patients: Number(summary?.patients || 0),
+          unreadMessages: Number(summary?.unreadMessages || 0),
+          publishedArticles: Number(summary?.publishedArticles || 0),
+          ratingAverage: Number(summary?.rating?.average || 0),
+          ratingTotal: Number(summary?.rating?.total || 0),
+        })
+
+        const mappedPatients = Array.isArray(patientsResponse?.data)
+          ? patientsResponse.data.map((item: any) => ({
+              id: item.id,
+              username: item.username,
+              avatar: buildAvatar(item.username),
+              lastVisit: toRelativeTime(item.lastVisitAt),
+              status: item.status === "active" ? "active" : "inactive",
+              tier: item.tier === "premium" ? "premium" : "free",
+              unreadMessages: Number(item.unreadMessages || 0),
+              consultations: Number(item.consultations || 0),
+              joinedDate: item.joinedDate || "",
+            }))
+          : []
+
+        if (mappedPatients.length > 0) {
+          setPatients(mappedPatients)
+        }
+
+        if (Array.isArray(apiAvailability) && apiAvailability.length > 0) {
+          setAvailability(availabilityRecordFromApi(apiAvailability))
+        }
+
+        if (stats) {
+          setRatingStats({
+            average: Number(stats.average || 0),
+            total: Number(stats.total || 0),
+            distribution: Array.isArray(stats.distribution) ? stats.distribution : sampleRatingStats.distribution,
+            thisMonth: Number(stats.thisMonth || 0),
+            lastMonth: Number(stats.lastMonth || 0),
+          })
+        }
+
+        if (Array.isArray(ratingsResponse?.data)) {
+          const mappedRatings = ratingsResponse.data.map((item: any) => ({
+            id: item.id,
+            user: item.user,
+            rating: item.rating,
+            comment: item.comment,
+            date: toRelativeTime(item.date),
+            anonymous: Boolean(item.anonymous),
+          }))
+          if (mappedRatings.length > 0) {
+            setMyRatings(mappedRatings)
+          }
+        }
+
+        if (Array.isArray(adviceItems)) {
+          setPublishedArticles(
+            adviceItems.map((item: any) => ({
+              id: item._id,
+              title: item.title,
+              category: item.category,
+              publishedAt: toRelativeTime(item.createdAt),
+              views: Number(item.viewsCount || 0),
+              hasVoiceNote: Boolean(item.voiceUrl),
+            }))
+          )
+        }
+      } catch {
+        // Keep fallback demo data when API fails.
+      }
+    }
+
+    void loadDashboard()
+  }, [doctorRecordId])
 
   const startRecording = () => {
     setIsRecording(true)
@@ -274,12 +446,41 @@ export default function DoctorDashboardPage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  const handlePublish = () => {
-    alert("Article published successfully!")
-    setArticleData({ title: "", category: "Hormones", content: "" })
-    setHasRecording(false)
-    setRecordingTime(0)
-    setUploadedFiles([])
+  const handlePublish = async () => {
+    try {
+      if (!doctorRecordId) throw new Error("Missing doctor id")
+      const created = await createDoctorAdvice({
+        doctorId: doctorRecordId,
+        title: articleData.title,
+        category: articleData.category,
+        contentType: hasRecording ? "Mixed" : "Text",
+        textContent: articleData.content,
+        voiceUrl: hasRecording ? "local://voice-note" : "",
+        audioDuration: recordingTime,
+        status: "published",
+      })
+
+      setPublishedArticles((prev) => [
+        {
+          id: created?._id || `${Date.now()}`,
+          title: created?.title || articleData.title,
+          category: created?.category || articleData.category,
+          publishedAt: "just now",
+          views: Number(created?.viewsCount || 0),
+          hasVoiceNote: Boolean(created?.voiceUrl) || hasRecording,
+        },
+        ...prev,
+      ])
+      setDashboardSummary((prev) => ({ ...prev, publishedArticles: prev.publishedArticles + 1 }))
+      alert("Article published successfully!")
+    } catch {
+      alert("Failed to publish article. Please try again.")
+    } finally {
+      setArticleData({ title: "", category: "Hormones", content: "" })
+      setHasRecording(false)
+      setRecordingTime(0)
+      setUploadedFiles([])
+    }
   }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -287,15 +488,15 @@ export default function DoctorDashboardPage() {
     if (!files) return
 
     setIsUploading(true)
-    
-    // Simulate upload delay
+
+    // Simulate upload delay.
     setTimeout(() => {
-      const newFiles = Array.from(files).map(file => ({
+      const newFiles = Array.from(files).map((file) => ({
         name: file.name,
         size: file.size,
-        type: file.type
+        type: file.type,
       }))
-      setUploadedFiles(prev => [...prev, ...newFiles])
+      setUploadedFiles((prev) => [...prev, ...newFiles])
       setIsUploading(false)
       if (fileInputRef.current) {
         fileInputRef.current.value = ""
@@ -304,7 +505,7 @@ export default function DoctorDashboardPage() {
   }
 
   const removeFile = (index: number) => {
-    setUploadedFiles(prev => prev.filter((_, i) => i !== index))
+    setUploadedFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
   const formatFileSize = (bytes: number) => {
@@ -319,15 +520,39 @@ export default function DoctorDashboardPage() {
     return File
   }
 
-  const handleSendMessage = (type: "text" | "voice") => {
-    if (type === "text" && messageToSend.trim()) {
-      alert(`Message sent to ${selectedPatient?.username}: ${messageToSend}`)
-      setMessageToSend("")
-    } else if (type === "voice" && hasRecording) {
-      alert(`Voice note sent to ${selectedPatient?.username}`)
-      setHasRecording(false)
-      setRecordingTime(0)
-      setSendingVoiceNote(false)
+  const handleSendMessage = async (type: "text" | "voice") => {
+    if (!selectedPatient || !doctorRecordId || !userId) return
+
+    try {
+      const chat = await getOrCreateDoctorChat({ doctorId: doctorRecordId, userId: String(selectedPatient.id) })
+      if (!chat?._id) throw new Error("Unable to create/find chat")
+
+      if (type === "text" && messageToSend.trim()) {
+        await sendMessage({
+          chatId: chat._id,
+          senderId: userId,
+          senderRole: "Doctor",
+          messageType: "text",
+          messageText: messageToSend,
+        })
+        alert(`Message sent to ${selectedPatient.username}`)
+        setMessageToSend("")
+      } else if (type === "voice" && hasRecording) {
+        await sendMessage({
+          chatId: chat._id,
+          senderId: userId,
+          senderRole: "Doctor",
+          messageType: "voice",
+          voiceUrl: "local://voice-note",
+          durationSec: recordingTime,
+        })
+        alert(`Voice note sent to ${selectedPatient.username}`)
+        setHasRecording(false)
+        setRecordingTime(0)
+        setSendingVoiceNote(false)
+      }
+    } catch {
+      alert("Failed to send message. Please try again.")
     }
   }
 
@@ -378,13 +603,17 @@ export default function DoctorDashboardPage() {
     }))
   }
 
-  const handleSaveAvailability = () => {
+  const handleSaveAvailability = async () => {
     setIsSavingAvailability(true)
-    // Simulate API call
-    setTimeout(() => {
-      setIsSavingAvailability(false)
+    try {
+      if (!doctorRecordId) throw new Error("Missing doctor id")
+      await updateDoctorAvailability(doctorRecordId, availabilityPayloadFromRecord(availability))
       alert("Availability saved successfully!")
-    }, 1000)
+    } catch {
+      alert("Failed to save availability. Please try again.")
+    } finally {
+      setIsSavingAvailability(false)
+    }
   }
 
   const getTotalHours = () => {
@@ -421,7 +650,7 @@ export default function DoctorDashboardPage() {
               <Users className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <p className="text-xl font-semibold">{patients.length}</p>
+              <p className="text-xl font-semibold">{dashboardSummary.patients}</p>
               <p className="text-xs text-muted-foreground">Patients</p>
             </div>
           </CardContent>
@@ -433,7 +662,7 @@ export default function DoctorDashboardPage() {
             </div>
             <div>
               <p className="text-xl font-semibold">
-                {patients.reduce((acc, p) => acc + p.unreadMessages, 0)}
+                {dashboardSummary.unreadMessages}
               </p>
               <p className="text-xs text-muted-foreground">Unread</p>
             </div>
@@ -445,7 +674,7 @@ export default function DoctorDashboardPage() {
               <FileText className="h-4 w-4 text-muted-foreground" />
             </div>
             <div>
-              <p className="text-xl font-semibold">{publishedArticles.length}</p>
+              <p className="text-xl font-semibold">{dashboardSummary.publishedArticles}</p>
               <p className="text-xs text-muted-foreground">Articles</p>
             </div>
           </CardContent>
@@ -457,10 +686,10 @@ export default function DoctorDashboardPage() {
             </div>
             <div>
               <div className="flex items-center gap-1">
-                <p className="text-xl font-semibold">{ratingStats.average}</p>
+                <p className="text-xl font-semibold">{dashboardSummary.ratingAverage || ratingStats.average}</p>
                 <Star className="h-3 w-3 fill-primary text-primary" />
               </div>
-              <p className="text-xs text-muted-foreground">{ratingStats.total} reviews</p>
+              <p className="text-xs text-muted-foreground">{dashboardSummary.ratingTotal || ratingStats.total} reviews</p>
             </div>
           </CardContent>
         </Card>

@@ -69,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: backendUser.email,
       role: backendUser.role === 'User' ? 'woman' : null,
       tier: backendUser.isPremium ? 'premium' : 'free',
+      avatar: backendUser.avatar || "",
     };
     login(frontendUser);
   }

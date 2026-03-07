@@ -39,6 +39,7 @@ export default function LoginPage() {
         email: backendUser.email,
         role: backendUser.role === 'User' ? 'woman' : backendUser.role === 'Admin' ? 'admin' : 'doctor',
         tier: backendUser.isPremium ? 'premium' : 'free',
+        avatar: backendUser.avatar || "",
       }
       login(frontendUser)
       if (frontendUser.role === 'admin') {
