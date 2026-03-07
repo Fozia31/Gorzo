@@ -84,7 +84,6 @@ function ChatView({ chat, onBack }: { chat: typeof chatQueue[0], onBack: () => v
 
   const handleSend = () => {
     if (message.trim()) {
-      // In real app, this would send the message
       setMessage("")
     }
   }
