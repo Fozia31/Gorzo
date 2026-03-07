@@ -1,10 +1,6 @@
 "use client"
 
-<<<<<<< HEAD
 import { Suspense, useState } from "react"
-=======
-import { useState, Suspense } from "react"
->>>>>>> e0b55d9ff6ccafb6c28bc3f5f2c7e6417afec56f
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -63,11 +59,7 @@ const doctors = [
   },
 ]
 
-<<<<<<< HEAD
 function PaymentPageContent() {
-=======
-function PaymentContent() {
->>>>>>> e0b55d9ff6ccafb6c28bc3f5f2c7e6417afec56f
   const searchParams = useSearchParams()
   const doctorId = searchParams.get("doctor")
   const amountParam = searchParams.get("amount")
@@ -435,17 +427,8 @@ function PaymentContent() {
 
 export default function PaymentPage() {
   return (
-<<<<<<< HEAD
     <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading payment options...</div>}>
       <PaymentPageContent />
-=======
-    <Suspense fallback={
-      <div className="flex min-h-[80vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    }>
-      <PaymentContent />
->>>>>>> e0b55d9ff6ccafb6c28bc3f5f2c7e6417afec56f
     </Suspense>
   )
 }
