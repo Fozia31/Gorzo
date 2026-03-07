@@ -41,12 +41,13 @@ export default function DoctorLoginPage() {
       }
       
       // Convert to frontend user shape
+      const tier: "premium" | "free" = backendUser.isPremium ? "premium" : "free"
       const frontendUser = {
         id: backendUser._id,
         username: backendUser.displayName,
         email: backendUser.email,
         role: 'doctor' as const,
-        tier: backendUser.isPremium ? 'premium' : 'free',
+        tier,
         avatar: backendUser.avatar || "",
       }
       

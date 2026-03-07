@@ -102,8 +102,8 @@ function ChatView({
   const [message, setMessage] = useState("")
   const [sendError, setSendError] = useState("")
   const [messages, setMessages] = useState<ChatMessage[]>([])
-  const messagesEndRef = useRef(null)
-  const socketRef = useRef(null)
+  const messagesEndRef = useRef<HTMLDivElement | null>(null)
+  const socketRef = useRef<ReturnType<typeof getSocket> | null>(null)
 
   useEffect(() => {
     // Fetch message history
@@ -111,11 +111,11 @@ function ChatView({
       try {
         const res = await chatApi.getMessages(chat.id)
         setMessages(
-          (res.data || []).map(msg => ({
+          (res.data || []).map((msg: { _id?: string | number; senderType?: string; messageText?: string; createdAt?: string }) => ({
             id: msg._id,
             sender: msg.senderType === 'doctor' ? 'doctor' : 'user',
-            content: msg.messageText,
-            time: new Date(msg.createdAt).toLocaleTimeString() || 'Now',
+            content: msg.messageText ?? "",
+            time: msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString() : "Now",
           }))
         )
       } catch {}
@@ -123,7 +123,7 @@ function ChatView({
     const socket = getSocket()
     socket.connect()
     socket.emit('joinPremium', chat.id)
-    socket.on('premiumMessage', (data) => {
+    socket.on('premiumMessage', (data: { chatId?: string | number; _id?: string | number; senderType?: string; messageText?: string; createdAt?: string }) => {
       // Only add if for this chat
       if (data.chatId === chat.id) {
         setMessages((prev) => [
@@ -131,8 +131,8 @@ function ChatView({
           {
             id: data._id || Date.now(),
             sender: data.senderType === 'doctor' ? 'doctor' : 'user',
-            content: data.messageText,
-            time: new Date(data.createdAt).toLocaleTimeString() || 'Now',
+            content: data.messageText ?? "",
+            time: data.createdAt ? new Date(data.createdAt).toLocaleTimeString() : "Now",
           },
         ])
       }
@@ -160,9 +160,7 @@ function ChatView({
       senderType: 'doctor',
     }
     // Send via WebSocket
-    if (socketRef.current) {
-      socketRef.current.emit('premiumMessage', newMsg)
-    }
+    socketRef.current?.emit('premiumMessage', newMsg)
     // Save to DB via chatApi
     try {
       await chatApi.sendMessage(newMsg)
@@ -242,6 +240,7 @@ function ChatView({
             </div>
           </div>
         ))}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}

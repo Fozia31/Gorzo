@@ -32,13 +32,16 @@ export default function LoginPage() {
     try {
       const res = await loginUser({ email: formData.username, password: formData.password })
       const backendUser = res.data
+      const role: "woman" | "admin" | "doctor" =
+        backendUser.role === "User" ? "woman" : backendUser.role === "Admin" ? "admin" : "doctor"
+      const tier: "premium" | "free" = backendUser.isPremium ? "premium" : "free"
       // convert to frontend user shape
       const frontendUser = {
         id: backendUser._id,
         username: backendUser.displayName,
         email: backendUser.email,
-        role: backendUser.role === 'User' ? 'woman' : backendUser.role === 'Admin' ? 'admin' : 'doctor',
-        tier: backendUser.isPremium ? 'premium' : 'free',
+        role,
+        tier,
         avatar: backendUser.avatar || "",
       }
       login(frontendUser)

@@ -336,10 +336,7 @@ export default function ConsultingPage() {
 
   const openDoctor = (doctor: Doctor) => {
     setSelectedDoctor(doctor)
-    setReviewPage(1)
-    setReviewTotalPages(1)
     setView("profile")
-    void refreshDoctorReviews(doctor, 1, false)
   }
 
   const startOrOpenChat = () => {
