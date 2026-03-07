@@ -14,6 +14,7 @@ const chatRoutes = require("./routes/chatRoutes");
 const messageRoutes = require("./routes/messageRoutes");
 const aiConversationRoutes = require("./routes/aiConversationRoutes");
 const personalAssistanceRoutes = require("./routes/personalAssistanceRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
 
 dotenv.config();
 
@@ -56,6 +57,7 @@ app.use("/api/chats", chatRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/ai-conversations", aiConversationRoutes);
 app.use("/api/personal-assistance", personalAssistanceRoutes);
+app.use("/api/payments", paymentRoutes);
 
 app.use((req, res) => {
     res.status(404).json({

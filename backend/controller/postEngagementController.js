@@ -29,6 +29,8 @@ const createPostEngagement = asyncHandler(async (req, res) => {
 
 	if (engagement.type === "Like") {
 		await Post.findByIdAndUpdate(req.body.postId, { $inc: { likes: 1 } });
+	} else if (engagement.type === "Repost") {
+		await Post.findByIdAndUpdate(req.body.postId, { $inc: { reposts: 1 } });
 	} else if (engagement.type === "Report") {
 		await Post.findByIdAndUpdate(req.body.postId, { $inc: { reports: 1 } });
 	}
@@ -83,6 +85,8 @@ const deletePostEngagement = asyncHandler(async (req, res) => {
 
 	if (engagement.type === "Like") {
 		await Post.findByIdAndUpdate(engagement.postId, { $inc: { likes: -1 } });
+	} else if (engagement.type === "Repost") {
+		await Post.findByIdAndUpdate(engagement.postId, { $inc: { reposts: -1 } });
 	} else if (engagement.type === "Report") {
 		await Post.findByIdAndUpdate(engagement.postId, { $inc: { reports: -1 } });
 	}

@@ -3,7 +3,7 @@ import { api } from "./api";
 export const createPostEngagement = async (engagementData) => {
   try {
     const response = await api.post('/post-engagements', engagementData);
-    return response.data;
+    return response.data.data;
   } catch (error) {
     throw error.response?.data || error.message;
   }

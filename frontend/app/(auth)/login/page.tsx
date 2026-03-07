@@ -2,16 +2,15 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { Eye, EyeOff, Mail, Lock, AlertCircle } from "lucide-react"
+import { Eye, EyeOff, Lock, AlertCircle, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/lib/auth-context"
 import { loginUser } from "@/api/userApi"
-
-// Note: we no longer use a simulated database; loginUser talks to backend
 
 export default function LoginPage() {
   const router = useRouter()
@@ -58,14 +57,22 @@ export default function LoginPage() {
   return (
     <div className="w-full max-w-md space-y-8">
       <div className="text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary">
-          <span className="font-serif text-2xl font-bold text-primary-foreground">G</span>
+        <div className="mx-auto flex flex-col items-center">
+          <div className="h-20 w-20 overflow-hidden rounded-full border-2 border-primary/20">
+            <Image 
+              src="/logo.jpg" 
+              alt="EFOY" 
+              width={80} 
+              height={80} 
+              className="h-full w-full object-cover"
+            />
+          </div>
         </div>
-        <h1 className="mt-6 font-serif text-3xl font-bold tracking-tight text-foreground">
+        <h1 className="mt-4 font-serif text-3xl font-bold tracking-tight text-foreground">
           Welcome back
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Your trusted companion for women&apos;s health
+          Your safe space to heal
         </p>
       </div>
 
@@ -87,7 +94,7 @@ export default function LoginPage() {
             <div className="space-y-2">
               <Label htmlFor="username">Email</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="username"
                   type="email"

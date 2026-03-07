@@ -42,8 +42,15 @@ import {
   ChevronRight,
   Star,
   TrendingUp,
-  ThumbsUp
+  ThumbsUp,
+  Plus,
+  X,
+  File,
+  FileImage,
+  FileType,
+  Download
 } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 
 // Sample patients
@@ -183,6 +190,27 @@ const ratingStats = {
   lastMonth: 8,
 }
 
+// Days of the week
+const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+// Time slots
+const timeSlots = [
+  "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+  "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
+  "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00"
+]
+
+// Initial availability
+const initialAvailability = {
+  Monday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }, { start: "14:00", end: "17:00" }] },
+  Tuesday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }, { start: "14:00", end: "17:00" }] },
+  Wednesday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }] },
+  Thursday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }, { start: "14:00", end: "17:00" }] },
+  Friday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }] },
+  Saturday: { enabled: false, slots: [] },
+  Sunday: { enabled: false, slots: [] },
+}
+
 export default function DoctorDashboardPage() {
   const { user, login } = useAuth()
   const [patients, setPatients] = useState(samplePatients)
@@ -199,6 +227,11 @@ export default function DoctorDashboardPage() {
     category: "Hormones",
     content: "",
   })
+  const [availability, setAvailability] = useState<Record<string, { enabled: boolean; slots: { start: string; end: string }[] }>>(initialAvailability)
+  const [isSavingAvailability, setIsSavingAvailability] = useState(false)
+  const [uploadedFiles, setUploadedFiles] = useState<{ name: string; size: number; type: string }[]>([])
+  const [isUploading, setIsUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Auto-login for demo
@@ -246,6 +279,44 @@ export default function DoctorDashboardPage() {
     setArticleData({ title: "", category: "Hormones", content: "" })
     setHasRecording(false)
     setRecordingTime(0)
+    setUploadedFiles([])
+  }
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+
+    setIsUploading(true)
+    
+    // Simulate upload delay
+    setTimeout(() => {
+      const newFiles = Array.from(files).map(file => ({
+        name: file.name,
+        size: file.size,
+        type: file.type
+      }))
+      setUploadedFiles(prev => [...prev, ...newFiles])
+      setIsUploading(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
+    }, 1000)
+  }
+
+  const removeFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + " B"
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB"
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB"
+  }
+
+  const getFileIcon = (type: string) => {
+    if (type.startsWith("image/")) return FileImage
+    if (type.includes("pdf")) return FileType
+    return File
   }
 
   const handleSendMessage = (type: "text" | "voice") => {
@@ -263,6 +334,72 @@ export default function DoctorDashboardPage() {
   const filteredPatients = patients.filter(patient =>
     patient.username.toLowerCase().includes(searchQuery.toLowerCase())
   )
+
+  const toggleDayEnabled = (day: string) => {
+    setAvailability(prev => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        enabled: !prev[day].enabled,
+        slots: !prev[day].enabled ? [{ start: "09:00", end: "17:00" }] : prev[day].slots
+      }
+    }))
+  }
+
+  const addTimeSlot = (day: string) => {
+    setAvailability(prev => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        slots: [...prev[day].slots, { start: "09:00", end: "17:00" }]
+      }
+    }))
+  }
+
+  const removeTimeSlot = (day: string, index: number) => {
+    setAvailability(prev => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        slots: prev[day].slots.filter((_, i) => i !== index)
+      }
+    }))
+  }
+
+  const updateTimeSlot = (day: string, index: number, field: "start" | "end", value: string) => {
+    setAvailability(prev => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        slots: prev[day].slots.map((slot, i) => 
+          i === index ? { ...slot, [field]: value } : slot
+        )
+      }
+    }))
+  }
+
+  const handleSaveAvailability = () => {
+    setIsSavingAvailability(true)
+    // Simulate API call
+    setTimeout(() => {
+      setIsSavingAvailability(false)
+      alert("Availability saved successfully!")
+    }, 1000)
+  }
+
+  const getTotalHours = () => {
+    let total = 0
+    Object.values(availability).forEach(day => {
+      if (day.enabled) {
+        day.slots.forEach(slot => {
+          const start = parseInt(slot.start.split(":")[0]) + parseInt(slot.start.split(":")[1]) / 60
+          const end = parseInt(slot.end.split(":")[0]) + parseInt(slot.end.split(":")[1]) / 60
+          total += end - start
+        })
+      }
+    })
+    return total.toFixed(1)
+  }
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -330,10 +467,14 @@ export default function DoctorDashboardPage() {
       </div>
 
       <Tabs defaultValue="patients" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 max-w-xl">
+        <TabsList className="grid w-full grid-cols-5 max-w-2xl">
           <TabsTrigger value="patients" className="gap-2">
             <Users className="h-4 w-4" />
             Patients
+          </TabsTrigger>
+          <TabsTrigger value="availability" className="gap-2">
+            <Calendar className="h-4 w-4" />
+            Availability
           </TabsTrigger>
           <TabsTrigger value="ratings" className="gap-2">
             <Star className="h-4 w-4" />
@@ -341,7 +482,7 @@ export default function DoctorDashboardPage() {
           </TabsTrigger>
           <TabsTrigger value="create" className="gap-2">
             <FileText className="h-4 w-4" />
-            Content
+            Info
           </TabsTrigger>
           <TabsTrigger value="published" className="gap-2">
             <Eye className="h-4 w-4" />
@@ -530,6 +671,119 @@ export default function DoctorDashboardPage() {
           )}
         </TabsContent>
 
+        {/* Availability Tab */}
+        <TabsContent value="availability" className="mt-6 space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Set Your Availability</CardTitle>
+                  <CardDescription>
+                    Define when you are available for consultations
+                  </CardDescription>
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-bold text-primary">{getTotalHours()}h</p>
+                  <p className="text-xs text-muted-foreground">Total weekly hours</p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {daysOfWeek.map((day) => (
+                <div key={day} className="rounded-lg border border-border p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        checked={availability[day]?.enabled || false}
+                        onCheckedChange={() => toggleDayEnabled(day)}
+                      />
+                      <span className={cn(
+                        "font-medium",
+                        !availability[day]?.enabled && "text-muted-foreground"
+                      )}>
+                        {day}
+                      </span>
+                    </div>
+                    {availability[day]?.enabled && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => addTimeSlot(day)}
+                        className="gap-1"
+                      >
+                        <Plus className="h-3 w-3" />
+                        Add Slot
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {availability[day]?.enabled && availability[day].slots.length > 0 && (
+                    <div className="mt-4 space-y-3">
+                      {availability[day].slots.map((slot, index) => (
+                        <div key={index} className="flex items-center gap-3">
+                          <div className="flex items-center gap-2 flex-1">
+                            <select
+                              className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+                              value={slot.start}
+                              onChange={(e) => updateTimeSlot(day, index, "start", e.target.value)}
+                            >
+                              {timeSlots.map(time => (
+                                <option key={time} value={time}>{time}</option>
+                              ))}
+                            </select>
+                            <span className="text-muted-foreground">to</span>
+                            <select
+                              className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+                              value={slot.end}
+                              onChange={(e) => updateTimeSlot(day, index, "end", e.target.value)}
+                            >
+                              {timeSlots.map(time => (
+                                <option key={time} value={time}>{time}</option>
+                              ))}
+                            </select>
+                          </div>
+                          {availability[day].slots.length > 1 && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => removeTimeSlot(day, index)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {availability[day]?.enabled && availability[day].slots.length === 0 && (
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      No time slots added. Click &quot;Add Slot&quot; to set your hours.
+                    </p>
+                  )}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-end">
+            <Button onClick={handleSaveAvailability} disabled={isSavingAvailability}>
+              {isSavingAvailability ? (
+                <>
+                  <Clock className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Availability
+                </>
+              )}
+            </Button>
+          </div>
+        </TabsContent>
+
         {/* Ratings Tab */}
         <TabsContent value="ratings" className="mt-6 space-y-6">
           {/* Rating Overview */}
@@ -699,6 +953,101 @@ export default function DoctorDashboardPage() {
                   className="resize-none"
                 />
               </div>
+            </CardContent>
+          </Card>
+
+          {/* File Upload Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Upload className="h-5 w-5 text-primary" />
+                Upload Files
+              </CardTitle>
+              <CardDescription>
+                Upload documents, PDFs, or images to include with your article
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.gif"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              
+              {/* Drop zone / Upload button */}
+              <div 
+                className="flex flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed border-border bg-muted/30 p-8 transition-colors hover:border-primary/50 hover:bg-muted/50 cursor-pointer"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {isUploading ? (
+                  <>
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                      <Upload className="h-6 w-6 text-primary animate-pulse" />
+                    </div>
+                    <p className="text-sm text-muted-foreground">Uploading...</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                      <Upload className="h-6 w-6 text-primary" />
+                    </div>
+                    <div className="text-center">
+                      <p className="font-medium">Click to upload files</p>
+                      <p className="text-sm text-muted-foreground">
+                        PDF, DOC, DOCX, PNG, JPG, or GIF (max 10MB)
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Uploaded files list */}
+              {uploadedFiles.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Uploaded Files ({uploadedFiles.length})</Label>
+                  <div className="space-y-2">
+                    {uploadedFiles.map((file, index) => {
+                      const FileIcon = getFileIcon(file.type)
+                      return (
+                        <div 
+                          key={index}
+                          className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background p-3"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                              <FileIcon className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium truncate max-w-[200px]">{file.name}</p>
+                              <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Download className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                removeFile(index)
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 

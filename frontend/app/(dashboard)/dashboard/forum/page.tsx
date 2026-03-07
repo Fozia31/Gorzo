@@ -29,6 +29,7 @@ import {
 import { 
   MessageCircle, 
   Heart, 
+  Repeat2,
   Flag, 
   MoreHorizontal, 
   Plus,
@@ -63,7 +64,7 @@ export default function ForumPage() {
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({})
   const [commentsMap, setCommentsMap] = useState<Record<string, any[]>>({})
   const [commentText, setCommentText] = useState("")
-  const [userEngagements, setUserEngagements] = useState<Record<string, any>>({})
+  const [userEngagements, setUserEngagements] = useState<Record<string, { Like?: any; Repost?: any; Report?: any }>>({})
 
   const handleLike = async (postId: string) => {
     if (!user) {
@@ -71,18 +72,21 @@ export default function ForumPage() {
       return
     }
 
-    const isCurrentlyLiked = userEngagements[postId]?.type === 'Like'
+    const isCurrentlyLiked = Boolean(userEngagements[postId]?.Like)
 
     try {
       if (isCurrentlyLiked) {
         // Unlike: delete the engagement
-        await deletePostEngagement(userEngagements[postId]._id)
+        await deletePostEngagement(userEngagements[postId].Like._id)
         setUserEngagements(prev => {
-          const newEngagements = { ...prev }
-          delete newEngagements[postId]
-          return newEngagements
+          const next = { ...prev }
+          if (next[postId]) {
+            delete next[postId].Like
+            if (!next[postId].Repost && !next[postId].Report) delete next[postId]
+          }
+          return next
         })
-        setPosts(posts.map(post => 
+        setPosts(prev => prev.map(post => 
           post.id === postId 
             ? { ...post, isLiked: false, likes: Math.max(0, post.likes - 1) }
             : post
@@ -96,9 +100,12 @@ export default function ForumPage() {
         })
         setUserEngagements(prev => ({
           ...prev,
-          [postId]: engagement
+          [postId]: {
+            ...(prev[postId] || {}),
+            Like: engagement,
+          },
         }))
-        setPosts(posts.map(post => 
+        setPosts(prev => prev.map(post => 
           post.id === postId 
             ? { ...post, isLiked: true, likes: post.likes + 1 }
             : post
@@ -110,8 +117,91 @@ export default function ForumPage() {
     }
   }
 
-  const handleReport = (postId: number) => {
-    alert(`Post ${postId} has been reported. Our moderators will review it.`)
+  const handleRepost = async (postId: string) => {
+    if (!user) {
+      alert("You must be logged in to repost")
+      return
+    }
+
+    const isCurrentlyReposted = Boolean(userEngagements[postId]?.Repost)
+
+    try {
+      if (isCurrentlyReposted) {
+        await deletePostEngagement(userEngagements[postId].Repost._id)
+        setUserEngagements(prev => {
+          const next = { ...prev }
+          if (next[postId]) {
+            delete next[postId].Repost
+            if (!next[postId].Like && !next[postId].Report) delete next[postId]
+          }
+          return next
+        })
+        setPosts(prev => prev.map(post => 
+          post.id === postId 
+            ? { ...post, isReposted: false, reposts: Math.max(0, (post.reposts || 0) - 1) }
+            : post
+        ))
+      } else {
+        const engagement = await createPostEngagement({
+          postId,
+          userId: user.id,
+          type: "Repost",
+        })
+        setUserEngagements(prev => ({
+          ...prev,
+          [postId]: {
+            ...(prev[postId] || {}),
+            Repost: engagement,
+          },
+        }))
+        setPosts(prev => prev.map(post => 
+          post.id === postId 
+            ? { ...post, isReposted: true, reposts: (post.reposts || 0) + 1 }
+            : post
+        ))
+      }
+    } catch (error) {
+      console.error("Failed to toggle repost:", error)
+      alert("Failed to update repost. Please try again.")
+    }
+  }
+
+  const handleReport = async (postId: string) => {
+    if (!user) {
+      alert("Please log in to report this post.")
+      return
+    }
+
+    if (userEngagements[postId]?.Report) {
+      alert("You have already reported this post.")
+      return
+    }
+
+    try {
+      const engagement = await createPostEngagement({
+        postId,
+        userId: user.id,
+        type: "Report",
+        reportReason: "Reported by community member",
+      })
+
+      setUserEngagements(prev => ({
+        ...prev,
+        [postId]: {
+          ...(prev[postId] || {}),
+          Report: engagement,
+        },
+      }))
+
+      alert("Post reported successfully.")
+    } catch (error: any) {
+      console.error("Failed to report post:", error)
+      if (error?.statusCode === 409) {
+        alert("You have already reported this post.")
+        return
+      }
+      alert(error?.message || "Unable to report this post. Please try again.")
+    }
   }
 
   const handleOpenComments = async (postId: string) => {
@@ -185,8 +275,10 @@ export default function ForumPage() {
         content: post.content,
         category: post.category,
         likes: 0,
+        reposts: 0,
         timeAgo: "Just now",
         isLiked: false,
+        isReposted: false,
       }
       setPosts([uiPost, ...posts])
       setCommentCounts(prev => ({ ...prev, [post._id]: 0 }))
@@ -212,7 +304,8 @@ export default function ForumPage() {
         const items = res || []
         const uiItems = items.map((post: any) => {
           const isMine = user && post.userId === user.id
-          const isLiked = userEngagements[post._id]?.type === 'Like'
+          const isLiked = Boolean(userEngagements[post._id]?.Like)
+          const isReposted = Boolean(userEngagements[post._id]?.Repost)
           return {
             id: post._id,
             userId: post.userId,
@@ -222,8 +315,10 @@ export default function ForumPage() {
             content: post.content,
             category: post.category,
             likes: post.likes || 0,
+            reposts: post.reposts || 0,
             timeAgo: new Date(post.createdAt).toLocaleString(),
             isLiked: isLiked,
+            isReposted: isReposted,
           }
         })
         setPosts(uiItems)
@@ -254,11 +349,20 @@ export default function ForumPage() {
 
     // Load user engagements
     if (user) {
-      getPostEngagements()
+      getPostEngagements({ userId: user.id })
         .then(engagements => {
-          const engagementMap: Record<string, any> = {}
+          const engagementMap: Record<string, { Like?: any; Repost?: any; Report?: any }> = {}
           engagements.forEach((engagement: any) => {
-            engagementMap[engagement.postId] = engagement
+            if (!engagementMap[engagement.postId]) {
+              engagementMap[engagement.postId] = {}
+            }
+            if (engagement.type === "Like") {
+              engagementMap[engagement.postId].Like = engagement
+            } else if (engagement.type === "Repost") {
+              engagementMap[engagement.postId].Repost = engagement
+            } else if (engagement.type === "Report") {
+              engagementMap[engagement.postId].Report = engagement
+            }
           })
           setUserEngagements(engagementMap)
         })
@@ -267,13 +371,22 @@ export default function ForumPage() {
         })
     }
   }, [user])
+
+  useEffect(() => {
+    setPosts(prev => prev.map(post => ({
+      ...post,
+      isLiked: Boolean(userEngagements[post.id]?.Like),
+      isReposted: Boolean(userEngagements[post.id]?.Repost),
+    })))
+  }, [userEngagements])
+
   return (
     <div className="space-y-6 p-4 md:p-6">
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="font-serif text-2xl font-semibold text-foreground md:text-3xl">
-            Posts
+            Discuss with Sisters
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             A safe space to share, ask, and support each other
@@ -417,6 +530,18 @@ export default function ForumPage() {
                     >
                       <Heart className={cn("h-4 w-4", post.isLiked && "fill-current")} />
                       {post.likes}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "h-8 gap-1.5 px-2",
+                        post.isReposted && "text-primary"
+                      )}
+                      onClick={() => handleRepost(post.id)}
+                    >
+                      <Repeat2 className={cn("h-4 w-4", post.isReposted && "fill-current")} />
+                      {post.reposts || 0}
                     </Button>
                     <Button variant="ghost" size="sm" className="h-8 gap-1.5 px-2" onClick={() => handleOpenComments(post.id)}>
                       <MessageCircle className="h-4 w-4" />

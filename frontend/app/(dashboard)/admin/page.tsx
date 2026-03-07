@@ -51,7 +51,7 @@ const initialDoctors = [
   {
     id: 1,
     name: "Dr. Amara Bekele",
-    email: "amara@gorzo.com",
+    email: "amara@efoy.com",
     specialty: "Gynecologist",
     status: "active",
     articles: 12,
@@ -60,7 +60,7 @@ const initialDoctors = [
   {
     id: 2,
     name: "Dr. Selam Haile",
-    email: "selam@gorzo.com",
+    email: "selam@efoy.com",
     specialty: "Nutritionist",
     status: "active",
     articles: 8,
@@ -69,7 +69,7 @@ const initialDoctors = [
   {
     id: 3,
     name: "Dr. Hana Tadesse",
-    email: "hana@gorzo.com",
+    email: "hana@efoy.com",
     specialty: "Reproductive Health",
     status: "active",
     articles: 5,
@@ -104,7 +104,7 @@ export default function AdminDashboardPage() {
       login({
         id: "3",
         username: "Admin User",
-        email: "admin@gorzo.com",
+        email: "admin@efoy.com",
         role: "admin",
         tier: "premium",
       })
@@ -260,7 +260,7 @@ export default function AdminDashboardPage() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="doctor@gorzo.com"
+                    placeholder="doctor@efoy.com"
                     className="pl-10"
                     value={newDoctor.email}
                     onChange={(e) => setNewDoctor({ ...newDoctor, email: e.target.value })}
