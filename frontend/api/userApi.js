@@ -19,3 +19,12 @@ export const loginUser = async (credentials) => {
     throw error.response?.data || error.message;
   }
 };
+
+export const updateUserById = async (userId, payload) => {
+  try {
+    const response = await api.put(`/users/${userId}`, payload);
+    return response.data.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};

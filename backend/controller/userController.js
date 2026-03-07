@@ -17,6 +17,7 @@ const createUser = asyncHandler(async (req, res) => {
 		password: req.body.password,
 		role: req.body.role || "User", // Allow specifying role, default to "User"
 		isPremium: Boolean(req.body.isPremium),
+		avatar: req.body.avatar || "",
 	});
 
 	return res.status(201).json({ success: true, message: "User registered", data: user });
@@ -28,20 +29,15 @@ const loginUser = asyncHandler(async (req, res) => {
 	const email = req.body.email.toLowerCase().trim();
 	const password = req.body.password;
 
-	// For hackathon: create user if doesn't exist, or return existing user
-	let user = await User.findOne({ email });
+	const user = await User.findOne({ email });
 	if (!user) {
-		// Create a demo user for hackathon
-		user = await User.create({
-			displayName: email.split('@')[0], // Use part before @ as display name
-			email: email,
-			password: password, // Store password as-is for demo
-			role: "User",
-			isPremium: false,
-		});
+		throw new ApiError(401, "Invalid email or password");
 	}
-	
-	// For hackathon: accept any password
+
+	if (user.password !== password) {
+		throw new ApiError(401, "Invalid email or password");
+	}
+
 	const userObj = user.toObject();
 	delete userObj.password;
 
@@ -81,7 +77,7 @@ const getUserById = asyncHandler(async (req, res) => {
 const updateUser = asyncHandler(async (req, res) => {
 	const userId = req.params.userId || req.params.id;
 	ensureValidObjectId(userId, "user id");
-	const allowedUpdates = ["displayName", "isPremium", "password"];
+	const allowedUpdates = ["displayName", "isPremium", "password", "avatar"];
 	const payload = {};
 	for (const field of allowedUpdates) {
 		if (req.body[field] !== undefined) payload[field] = req.body[field];

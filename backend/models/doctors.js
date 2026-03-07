@@ -1,5 +1,40 @@
 const mongoose = require("mongoose");
 
+const timeSlotSchema = new mongoose.Schema(
+	{
+		start: {
+			type: String,
+			required: true,
+			trim: true,
+		},
+		end: {
+			type: String,
+			required: true,
+			trim: true,
+		},
+	},
+	{ _id: false }
+);
+
+const availabilitySchema = new mongoose.Schema(
+	{
+		day: {
+			type: String,
+			required: true,
+			enum: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+		},
+		enabled: {
+			type: Boolean,
+			default: false,
+		},
+		slots: {
+			type: [timeSlotSchema],
+			default: [],
+		},
+	},
+	{ _id: false }
+);
+
 const doctorSchema = new mongoose.Schema(
 	{
 		userId: {
@@ -28,6 +63,15 @@ const doctorSchema = new mongoose.Schema(
 			type: String,
 			trim: true,
 			default: "",
+		},
+		availability: {
+			type: [availabilitySchema],
+			default: [],
+		},
+		consultationCount: {
+			type: Number,
+			min: 0,
+			default: 0,
 		},
 	},
 	{

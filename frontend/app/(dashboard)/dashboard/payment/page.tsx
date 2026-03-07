@@ -1,10 +1,14 @@
 "use client"
 
+<<<<<<< HEAD
 import { Suspense, useState } from "react"
+=======
+import { useState, Suspense } from "react"
+>>>>>>> e0b55d9ff6ccafb6c28bc3f5f2c7e6417afec56f
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { 
   CheckCircle2, 
   Phone, 
@@ -13,52 +17,69 @@ import {
   ArrowLeft,
   Loader2,
   Clock,
-  Smartphone
+  Smartphone,
+  Star,
+  MessageCircle
 } from "lucide-react"
 import Link from "next/link"
-import { cn } from "@/lib/utils"
-
 import { useSearchParams } from "next/navigation"
+import { useAuth } from "@/lib/auth-context"
 
 type PaymentStatus = "idle" | "processing" | "waiting" | "success" | "error"
 
-const plans = [
+// Doctor data (matching consulting page)
+const doctors = [
   {
-    id: "monthly",
-    name: "Monthly",
-    price: 299,
-    period: "/month",
-    description: "Perfect for trying out premium features",
+    id: 1,
+    name: "Dr. Amara Bekele",
+    specialty: "Gynecologist",
+    avatar: "/doctors/amara.jpg",
+    rating: 4.9,
+    consultationFee: 299,
   },
   {
-    id: "quarterly",
-    name: "Quarterly",
-    price: 799,
-    period: "/3 months",
-    description: "Save 10% with quarterly billing",
-    savings: "Save 10%",
+    id: 2,
+    name: "Dr. Selam Haile",
+    specialty: "Nutritionist",
+    avatar: "/doctors/selam.jpg",
+    rating: 4.8,
+    consultationFee: 249,
   },
   {
-    id: "yearly",
-    name: "Yearly",
-    price: 2999,
-    period: "/year",
-    description: "Best value - save 15%",
-    savings: "Save 15%",
-    popular: true,
+    id: 3,
+    name: "Dr. Hana Tadesse",
+    specialty: "Reproductive Health",
+    avatar: "/doctors/hana.jpg",
+    rating: 4.9,
+    consultationFee: 349,
+  },
+  {
+    id: 4,
+    name: "Dr. Meron Alemu",
+    specialty: "Mental Health",
+    avatar: "/doctors/meron.jpg",
+    rating: 4.7,
+    consultationFee: 279,
   },
 ]
 
+<<<<<<< HEAD
 function PaymentPageContent() {
+=======
+function PaymentContent() {
+>>>>>>> e0b55d9ff6ccafb6c28bc3f5f2c7e6417afec56f
   const searchParams = useSearchParams()
   const doctorId = searchParams.get("doctor")
+  const amountParam = searchParams.get("amount")
+  const { updateTier } = useAuth()
   
-  const [selectedPlan, setSelectedPlan] = useState("yearly")
   const [phoneNumber, setPhoneNumber] = useState("")
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("idle")
   const [transactionId, setTransactionId] = useState("")
 
-  const selectedPlanData = plans.find(p => p.id === selectedPlan)
+  // Find the doctor
+  const doctor = doctorId ? doctors.find(d => d.id === parseInt(doctorId)) : null
+  const amount = amountParam ? parseInt(amountParam) : doctor?.consultationFee || 299
 
   const formatPhoneNumber = (value: string) => {
     // Remove non-digits
@@ -110,6 +131,28 @@ function PaymentPageContent() {
     // Simulate successful payment
     setTransactionId(`MP${Date.now().toString().slice(-10)}`)
     setPaymentStatus("success")
+    
+    // Upgrade user to premium status
+    updateTier("premium")
+  }
+
+  // Redirect if no doctor specified
+  if (!doctor) {
+    return (
+      <div className="flex min-h-[80vh] items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center p-8 text-center">
+            <h2 className="mb-2 font-serif text-xl font-semibold">No Doctor Selected</h2>
+            <p className="mb-6 text-muted-foreground">
+              Please select a doctor from the consulting page first.
+            </p>
+            <Link href="/dashboard/consulting">
+              <Button>Go to Consulting</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   if (paymentStatus === "success") {
@@ -122,7 +165,7 @@ function PaymentPageContent() {
             </div>
             <h2 className="mb-2 font-serif text-2xl font-semibold">Payment Successful!</h2>
             <p className="mb-6 text-muted-foreground">
-              Your premium subscription is now active. Enjoy unlimited access to all features.
+              You now have access to chat with {doctor.name}.
             </p>
             
             <div className="mb-6 w-full space-y-3 rounded-lg bg-muted/50 p-4 text-left">
@@ -132,11 +175,11 @@ function PaymentPageContent() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Amount Paid</span>
-                <span className="font-medium">{selectedPlanData?.price} ETB</span>
+                <span className="font-medium">{amount} ETB</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Plan</span>
-                <span className="font-medium">{selectedPlanData?.name}</span>
+                <span className="text-muted-foreground">Doctor</span>
+                <span className="font-medium">{doctor.name}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Phone Number</span>
@@ -145,15 +188,15 @@ function PaymentPageContent() {
             </div>
 
             <div className="flex w-full flex-col gap-2">
-              <Link href={doctorId ? `/dashboard/consulting?payment=success&doctor=${doctorId}` : "/dashboard/consulting?payment=success"} className="w-full">
+              <Link href={`/dashboard/consulting?payment=success&doctor=${doctorId}`} className="w-full">
                 <Button className="w-full gap-2">
-                  <Crown className="h-4 w-4" />
-                  {doctorId ? "Start Consultation" : "Go to Consulting"}
+                  <MessageCircle className="h-4 w-4" />
+                  Start Chatting with {doctor.name.split(' ')[0]}
                 </Button>
               </Link>
-              <Link href="/dashboard" className="w-full">
+              <Link href="/dashboard/consulting" className="w-full">
                 <Button variant="outline" className="w-full">
-                  Go to Dashboard
+                  Back to Consulting
                 </Button>
               </Link>
             </div>
@@ -224,7 +267,7 @@ function PaymentPageContent() {
         </Link>
         <div>
           <h1 className="font-serif text-2xl font-semibold text-foreground md:text-3xl">
-            Upgrade to Premium
+            Pay for Consultation
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Pay securely with M-Pesa Ethiopia
@@ -233,77 +276,67 @@ function PaymentPageContent() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Plan Selection */}
+        {/* Doctor Info & What You Get */}
         <div className="space-y-4">
-          <h2 className="font-medium">Select Your Plan</h2>
-          <div className="space-y-3">
-            {plans.map((plan) => (
-              <Card 
-                key={plan.id}
-                className={cn(
-                  "cursor-pointer transition-all",
-                  selectedPlan === plan.id 
-                    ? "border-primary ring-2 ring-primary/20" 
-                    : "hover:border-primary/50"
-                )}
-                onClick={() => setSelectedPlan(plan.id)}
-              >
-                <CardContent className="flex items-center gap-4 p-4">
-                  <div className={cn(
-                    "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2",
-                    selectedPlan === plan.id 
-                      ? "border-primary bg-primary" 
-                      : "border-muted-foreground/30"
-                  )}>
-                    {selectedPlan === plan.id && (
-                      <CheckCircle2 className="h-4 w-4 text-primary-foreground" />
-                    )}
+          {/* Selected Doctor */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Selected Doctor</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-4">
+                <Avatar className="h-16 w-16">
+                  <AvatarImage src={doctor.avatar} />
+                  <AvatarFallback className="bg-secondary text-secondary-foreground text-xl">
+                    {doctor.name.split(' ').map(n => n[0]).join('')}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-lg">{doctor.name}</h3>
+                  <p className="text-muted-foreground">{doctor.specialty}</p>
+                  <div className="flex items-center gap-1 mt-1">
+                    <Star className="h-4 w-4 fill-secondary-foreground text-secondary-foreground" />
+                    <span className="font-medium">{doctor.rating}</span>
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{plan.name}</span>
-                      {plan.popular && (
-                        <Badge className="h-5 text-[10px]">Most Popular</Badge>
-                      )}
-                      {plan.savings && (
-                        <Badge variant="secondary" className="h-5 text-[10px]">
-                          {plan.savings}
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">{plan.description}</p>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xl font-bold">{plan.price}</span>
-                    <span className="text-sm text-muted-foreground"> ETB</span>
-                    <p className="text-xs text-muted-foreground">{plan.period}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-bold text-primary">{amount} ETB</p>
+                  <p className="text-xs text-muted-foreground">one-time</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-          {/* Premium Features */}
+          {/* What You Get */}
           <Card className="border-secondary/30 bg-secondary/5">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Crown className="h-5 w-5 text-secondary-foreground" />
-                Premium Features
+                What You Get
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               {[
-                "Unlimited doctor consultations",
-                "Priority chat queue",
-                "Personalized health insights",
-                "Access to all voice notes",
-                "Ad-free experience",
+                `Private chat access with ${doctor.name}`,
+                "Personalized health advice",
+                "Response within doctor's available hours",
+                "Secure and confidential communication",
+                "Chat history saved for your reference",
               ].map((feature, i) => (
                 <div key={i} className="flex items-center gap-2 text-sm">
-                  <CheckCircle2 className="h-4 w-4 text-secondary-foreground" />
+                  <CheckCircle2 className="h-4 w-4 text-secondary-foreground shrink-0" />
                   <span>{feature}</span>
                 </div>
               ))}
+            </CardContent>
+          </Card>
+
+          {/* Important Note */}
+          <Card className="border-dashed">
+            <CardContent className="p-4">
+              <p className="text-sm text-muted-foreground">
+                <strong className="text-foreground">Note:</strong> This is a one-time payment for consultation access with this specific doctor. To chat with other doctors, you&apos;ll need to pay for each consultation separately.
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -346,17 +379,17 @@ function PaymentPageContent() {
 
               <div className="rounded-lg bg-muted/50 p-4 space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Plan</span>
-                  <span className="font-medium">{selectedPlanData?.name}</span>
+                  <span className="text-muted-foreground">Doctor</span>
+                  <span className="font-medium">{doctor.name}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Duration</span>
-                  <span>{selectedPlanData?.period.replace("/", "")}</span>
+                  <span className="text-muted-foreground">Specialty</span>
+                  <span>{doctor.specialty}</span>
                 </div>
                 <div className="border-t pt-2 mt-2">
                   <div className="flex justify-between">
                     <span className="font-medium">Total</span>
-                    <span className="text-xl font-bold">{selectedPlanData?.price} ETB</span>
+                    <span className="text-xl font-bold">{amount} ETB</span>
                   </div>
                 </div>
               </div>
@@ -374,7 +407,7 @@ function PaymentPageContent() {
                   </>
                 ) : (
                   <>
-                    Pay {selectedPlanData?.price} ETB
+                    Pay {amount} ETB
                   </>
                 )}
               </Button>
@@ -402,8 +435,17 @@ function PaymentPageContent() {
 
 export default function PaymentPage() {
   return (
+<<<<<<< HEAD
     <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading payment options...</div>}>
       <PaymentPageContent />
+=======
+    <Suspense fallback={
+      <div className="flex min-h-[80vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    }>
+      <PaymentContent />
+>>>>>>> e0b55d9ff6ccafb6c28bc3f5f2c7e6417afec56f
     </Suspense>
   )
 }

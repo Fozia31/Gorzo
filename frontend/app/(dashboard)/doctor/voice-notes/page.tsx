@@ -24,6 +24,10 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useAuth } from "@/lib/auth-context"
+import { getDoctorAdviceByDoctor } from "@/api/doctorAdviceApi"
+import { getDoctorByUserId, getDoctorPatients } from "@/api/doctorApi"
+import { getOrCreateDoctorChat } from "@/api/chatApi"
+import { deleteMessageById, sendMessage } from "@/api/messageApi"
 import { 
   Mic,
   MicOff,
@@ -106,16 +110,37 @@ const patients = [
   { id: 4, username: "WellnessJourney", avatar: "WJ" },
 ]
 
+type VoiceNoteItem = {
+  id: string | number
+  backendId?: string
+  title: string
+  duration: string
+  createdAt: string
+  type: "article" | "patient"
+  articleTitle?: string
+  patientName?: string
+  status?: string
+  plays?: number
+}
+
+const sampleVoiceNotesTyped: VoiceNoteItem[] = sampleVoiceNotes.map((note) => ({
+  ...note,
+  type: note.type === "article" ? "article" : "patient",
+}))
+
 export default function VoiceNotesPage() {
   const { user, login } = useAuth()
-  const [voiceNotes, setVoiceNotes] = useState(sampleVoiceNotes)
+  const userId = user?.id
+  const [doctorRecordId, setDoctorRecordId] = useState<string>("")
+  const [voiceNotes, setVoiceNotes] = useState<VoiceNoteItem[]>(sampleVoiceNotesTyped)
+  const [patientOptions, setPatientOptions] = useState(patients)
   const [searchQuery, setSearchQuery] = useState("")
   const [filterType, setFilterType] = useState<string>("all")
   const [isRecording, setIsRecording] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
   const [hasRecording, setHasRecording] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [playingId, setPlayingId] = useState<number | null>(null)
+  const [playingId, setPlayingId] = useState<string | number | null>(null)
   const [newNoteTitle, setNewNoteTitle] = useState("")
   const [selectedPatient, setSelectedPatient] = useState("")
   const [sendDialogOpen, setSendDialogOpen] = useState(false)
@@ -127,11 +152,79 @@ export default function VoiceNotesPage() {
       login({
         id: "2",
         username: "Dr. Amara",
-        email: "doctor@gorzo.com",
+        email: "doctor@efoy.com",
         role: "doctor",
+        tier: "premium",
       })
     }
   }, [user, login])
+
+  useEffect(() => {
+    const loadDoctorRecordId = async () => {
+      if (!userId) return
+      try {
+        const doctor = await getDoctorByUserId(userId)
+        if (doctor?._id) setDoctorRecordId(String(doctor._id))
+      } catch {
+        setDoctorRecordId("")
+      }
+    }
+
+    void loadDoctorRecordId()
+  }, [userId])
+
+  useEffect(() => {
+    const loadVoiceData = async () => {
+      if (!doctorRecordId) return
+
+      try {
+        const [adviceItems, patientResponse] = await Promise.all([
+          getDoctorAdviceByDoctor(doctorRecordId, { status: "published" }),
+          getDoctorPatients(doctorRecordId, { limit: 100 }),
+        ])
+
+        if (Array.isArray(adviceItems)) {
+          const articleVoiceNotes = adviceItems
+            .filter((item: any) => Boolean(item.voiceUrl))
+            .map((item: any) => ({
+              id: item._id,
+              backendId: item._id,
+              title: item.title,
+              duration: item.audioDuration ? formatTime(item.audioDuration) : "0:00",
+              createdAt: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "N/A",
+              type: "article" as const,
+              articleTitle: item.title,
+              plays: Number(item.viewsCount || 0),
+            }))
+
+          setVoiceNotes((prev) => {
+            const patientNotes = prev.filter((note: any) => note.type === "patient")
+            return [...patientNotes, ...articleVoiceNotes]
+          })
+        }
+
+        if (Array.isArray(patientResponse?.data)) {
+          setPatientOptions(
+            patientResponse.data.map((item: any) => ({
+              id: item.id,
+              username: item.username,
+              avatar: item.username
+                .split(" ")
+                .filter(Boolean)
+                .slice(0, 2)
+                .map((part: string) => part[0])
+                .join("")
+                .toUpperCase(),
+            }))
+          )
+        }
+      } catch {
+        // Keep sample data when API fails.
+      }
+    }
+
+    void loadVoiceData()
+  }, [doctorRecordId])
 
   // Recording timer
   useEffect(() => {
@@ -173,7 +266,7 @@ export default function VoiceNotesPage() {
     setRecordingTime(0)
   }
 
-  const togglePlayback = (id?: number) => {
+  const togglePlayback = (id?: string | number) => {
     if (id !== undefined) {
       if (playingId === id) {
         setIsPlaying(!isPlaying)
@@ -187,29 +280,52 @@ export default function VoiceNotesPage() {
   }
 
   const handleSendVoiceNote = () => {
-    if (!hasRecording || !newNoteTitle || !selectedPatient) return
-    
-    const patient = patients.find(p => p.id.toString() === selectedPatient)
-    const newNote = {
-      id: voiceNotes.length + 1,
-      title: newNoteTitle,
-      duration: formatTime(recordingTime),
-      createdAt: "Just now",
-      type: "patient" as const,
-      patientName: patient?.username || "Unknown",
-      status: "sent" as const,
+    if (!hasRecording || !newNoteTitle || !selectedPatient || !doctorRecordId || !userId) return
+
+    const submit = async () => {
+      const patient = patientOptions.find((p) => p.id.toString() === selectedPatient)
+      const chat = await getOrCreateDoctorChat({ doctorId: doctorRecordId, userId: selectedPatient })
+      const sent = await sendMessage({
+        chatId: chat._id,
+        senderId: userId,
+        senderRole: "Doctor",
+        messageType: "voice",
+        voiceUrl: "local://voice-note",
+        durationSec: recordingTime,
+      })
+
+      const newNote = {
+        id: sent?._id || voiceNotes.length + 1,
+        backendId: sent?._id,
+        title: newNoteTitle,
+        duration: formatTime(recordingTime),
+        createdAt: "Just now",
+        type: "patient" as const,
+        patientName: patient?.username || "Unknown",
+        status: "sent" as const,
+      }
+
+      setVoiceNotes([newNote, ...voiceNotes])
+      setHasRecording(false)
+      setRecordingTime(0)
+      setNewNoteTitle("")
+      setSelectedPatient("")
+      setSendDialogOpen(false)
     }
-    
-    setVoiceNotes([newNote, ...voiceNotes])
-    setHasRecording(false)
-    setRecordingTime(0)
-    setNewNoteTitle("")
-    setSelectedPatient("")
-    setSendDialogOpen(false)
+
+    void submit()
   }
 
-  const deleteVoiceNote = (id: number) => {
-    setVoiceNotes(voiceNotes.filter(note => note.id !== id))
+  const deleteVoiceNote = (id: number | string) => {
+    const remove = async () => {
+      const note = voiceNotes.find((item) => item.id === id)
+      if (note?.backendId && note.type === "patient") {
+        await deleteMessageById(note.backendId)
+      }
+      setVoiceNotes(voiceNotes.filter((item) => item.id !== id))
+    }
+
+    void remove()
   }
 
   const filteredNotes = voiceNotes.filter(note => {
@@ -503,7 +619,7 @@ export default function VoiceNotesPage() {
                       <SelectValue placeholder="Select a patient" />
                     </SelectTrigger>
                     <SelectContent>
-                      {patients.map((patient) => (
+                      {patientOptions.map((patient) => (
                         <SelectItem key={patient.id} value={patient.id.toString()}>
                           <div className="flex items-center gap-2">
                             <Avatar className="h-5 w-5">
@@ -554,7 +670,7 @@ function VoiceNoteCard({
   onPlayToggle, 
   onDelete 
 }: { 
-  note: typeof sampleVoiceNotes[0]
+  note: VoiceNoteItem
   isPlaying: boolean
   onPlayToggle: () => void
   onDelete: () => void

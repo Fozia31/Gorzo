@@ -1,4 +1,5 @@
 import Link from "next/link"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Shield, BookOpen, MessageCircle, Sparkles, ArrowRight, Stethoscope } from "lucide-react"
 
@@ -8,11 +9,16 @@ export default function HomePage() {
       {/* Hero Section */}
       <header className="border-b border-border/50">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary">
-              <span className="font-serif text-lg font-bold text-primary-foreground">G</span>
+          <Link href="/" className="flex items-center">
+            <div className="h-10 w-10 overflow-hidden rounded-full border-2 border-primary/20">
+              <Image 
+                src="/logo.jpg" 
+                alt="EFOY" 
+                width={40} 
+                height={40} 
+                className="h-full w-full object-cover"
+              />
             </div>
-            <span className="font-serif text-xl font-semibold">Gorzo</span>
           </Link>
           <div className="flex items-center gap-3">
             <Link href="/login">
@@ -125,7 +131,7 @@ export default function HomePage() {
                   </h3>
                   <p className="mt-2 text-muted-foreground">
                     We understand the sensitive nature of women&apos;s health. That&apos;s why we&apos;ve built 
-                    Gorzo with privacy at its core. Anonymous usernames and encrypted data 
+                    EFOY with privacy at its core. Anonymous usernames and encrypted data 
                     ensure your journey stays private and secure.
                   </p>
                 </div>
@@ -141,7 +147,7 @@ export default function HomePage() {
               Ready to start your wellness journey?
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
-              Join thousands of Ethiopian women who trust Gorzo for their health needs.
+              Join thousands of Ethiopian women who trust EFOY for their health needs.
             </p>
             <Link href="/register" className="mt-8 inline-block">
               <Button size="lg" className="gap-2">
@@ -157,14 +163,19 @@ export default function HomePage() {
       <footer className="border-t border-border/50 py-8">
         <div className="container mx-auto px-4">
           <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                <span className="font-serif text-sm font-bold text-primary-foreground">G</span>
+            <div className="flex items-center">
+              <div className="h-8 w-8 overflow-hidden rounded-full border border-primary/20">
+                <Image 
+                  src="/logo.jpg" 
+                  alt="EFOY" 
+                  width={32} 
+                  height={32} 
+                  className="h-full w-full object-cover"
+                />
               </div>
-              <span className="font-serif font-semibold">Gorzo</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              &copy; 2024 Gorzo. All rights reserved. Made with care for Ethiopian women.
+              &copy; 2026 EFOY. All rights reserved. Made with care for Ethiopian women.
             </p>
           </div>
         </div>

@@ -3,7 +3,7 @@ import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Gorzo - Premium Women\'s Health Platform',
+  title: 'EFOY - Premium Women\'s Health Platform',
   description: 'Your private, trusted companion for women\'s health. Access anonymous forums, expert knowledge, and personalized consulting.',
   generator: 'v0.app',
   icons: {

@@ -31,6 +31,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useAuth } from "@/lib/auth-context"
+import { getAdmins } from "@/api/adminApi"
+import { createDoctorByAdmin, deleteDoctorById, getDoctorById, getDoctors } from "@/api/doctorApi"
 import { 
   UserPlus,
   MoreHorizontal,
@@ -43,33 +45,46 @@ import {
   Users,
   FileText,
   Flag,
-  Eye
+  Eye,
+  Calendar,
+  Clock,
+  Info
 } from "lucide-react"
 
 // Sample doctors
+type DoctorRow = {
+  id: string
+  name: string
+  email: string
+  specialty: string
+  status: string
+  articles: number
+  joinedAt: string
+}
+
 const initialDoctors = [
   {
-    id: 1,
+    id: "1",
     name: "Dr. Amara Bekele",
-    email: "amara@gorzo.com",
+    email: "amara@efoy.com",
     specialty: "Gynecologist",
     status: "active",
     articles: 12,
     joinedAt: "Jan 2024",
   },
   {
-    id: 2,
+    id: "2",
     name: "Dr. Selam Haile",
-    email: "selam@gorzo.com",
+    email: "selam@efoy.com",
     specialty: "Nutritionist",
     status: "active",
     articles: 8,
     joinedAt: "Feb 2024",
   },
   {
-    id: 3,
+    id: "3",
     name: "Dr. Hana Tadesse",
-    email: "hana@gorzo.com",
+    email: "hana@efoy.com",
     specialty: "Reproductive Health",
     status: "active",
     articles: 5,
@@ -88,8 +103,13 @@ const specialties = [
 
 export default function AdminDashboardPage() {
   const { user, login } = useAuth()
-  const [doctors, setDoctors] = useState(initialDoctors)
+  const [doctors, setDoctors] = useState<DoctorRow[]>(initialDoctors)
+  const [adminId, setAdminId] = useState<string>("")
+  const [isSavingDoctor, setIsSavingDoctor] = useState(false)
   const [isAddOpen, setIsAddOpen] = useState(false)
+  const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false)
+  const [selectedDoctorProfile, setSelectedDoctorProfile] = useState<any | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [newDoctor, setNewDoctor] = useState({
     name: "",
@@ -104,31 +124,100 @@ export default function AdminDashboardPage() {
       login({
         id: "3",
         username: "Admin User",
-        email: "admin@gorzo.com",
+        email: "admin@efoy.com",
         role: "admin",
         tier: "premium",
       })
     }
   }, [user, login])
 
-  const handleAddDoctor = () => {
-    const doctor = {
-      id: doctors.length + 1,
-      name: newDoctor.name,
-      email: newDoctor.email,
-      specialty: newDoctor.specialty,
-      status: "active",
-      articles: 0,
-      joinedAt: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+  useEffect(() => {
+    const loadAdminAndDoctors = async () => {
+      if (!user) return
+
+      try {
+        const [adminsRes, doctorsRes] = await Promise.all([
+          getAdmins({ limit: 100 }),
+          getDoctors({ limit: 100 }),
+        ])
+
+        const admins = Array.isArray(adminsRes?.data) ? adminsRes.data : []
+        const matchedAdmin = admins.find((item: any) => String(item?.userId?._id) === String(user.id))
+          || admins.find((item: any) => String(item?.userId?.email || "").toLowerCase() === String(user.email || "").toLowerCase())
+          || admins[0]
+
+        if (matchedAdmin?._id) {
+          setAdminId(String(matchedAdmin._id))
+        }
+
+        const items = Array.isArray(doctorsRes?.data) ? doctorsRes.data : []
+        if (items.length > 0) {
+          setDoctors(
+            items.map((item: any) => ({
+              id: String(item._id),
+              name: item?.userId?.displayName || "Unknown",
+              email: item?.userId?.email || "",
+              specialty: item?.specialization || "N/A",
+              status: item?.verificationStatus === "Rejected" ? "inactive" : "active",
+              articles: 0,
+              joinedAt: item?.createdAt
+                ? new Date(item.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })
+                : "",
+            }))
+          )
+        }
+      } catch {
+        // Keep fallback sample data when backend is unavailable.
+      }
     }
-    setDoctors([...doctors, doctor])
-    setNewDoctor({ name: "", email: "", specialty: "Gynecologist", tempPassword: "" })
-    setIsAddOpen(false)
+
+    void loadAdminAndDoctors()
+  }, [user])
+
+  const handleAddDoctor = async () => {
+    if (!adminId) {
+      alert("Admin profile not found. Please log in with a valid admin account.")
+      return
+    }
+
+    setIsSavingDoctor(true)
+    try {
+      const created = await createDoctorByAdmin(adminId, {
+        displayName: newDoctor.name,
+        email: newDoctor.email,
+        password: newDoctor.tempPassword,
+        specialization: newDoctor.specialty,
+      })
+
+      const mapped = {
+        id: String(created?.doctor?._id || Date.now()),
+        name: created?.user?.displayName || newDoctor.name,
+        email: created?.user?.email || newDoctor.email,
+        specialty: created?.doctor?.specialization || newDoctor.specialty,
+        status: "active",
+        articles: 0,
+        joinedAt: new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+      }
+
+      setDoctors((prev) => [mapped, ...prev])
+      setNewDoctor({ name: "", email: "", specialty: "Gynecologist", tempPassword: "" })
+      setIsAddOpen(false)
+      alert("Doctor account created. The doctor can now log in from Doctor Portal using this email/password.")
+    } catch (err: any) {
+      alert(err?.message || "Failed to create doctor account")
+    } finally {
+      setIsSavingDoctor(false)
+    }
   }
 
-  const handleDeleteDoctor = (id: number) => {
+  const handleDeleteDoctor = async (id: string) => {
     if (confirm("Are you sure you want to remove this doctor?")) {
-      setDoctors(doctors.filter(d => d.id !== id))
+      try {
+        await deleteDoctorById(String(id))
+        setDoctors(doctors.filter(d => d.id !== id))
+      } catch (err: any) {
+        alert(err?.message || "Failed to remove doctor")
+      }
     }
   }
 
@@ -137,6 +226,27 @@ export default function AdminDashboardPage() {
     doctor.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
     doctor.specialty.toLowerCase().includes(searchQuery.toLowerCase())
   )
+
+  const handleViewProfile = async (doctorId: string | number) => {
+    setIsProfileOpen(true)
+    setIsLoadingProfile(true)
+    setSelectedDoctorProfile(null)
+    try {
+      const doctor = await getDoctorById(String(doctorId))
+      setSelectedDoctorProfile(doctor)
+    } catch (err: any) {
+      alert(err?.message || "Failed to load doctor profile")
+      setIsProfileOpen(false)
+    } finally {
+      setIsLoadingProfile(false)
+    }
+  }
+
+  const getAvailabilityLabel = (availability: any[] = []) => {
+    const activeDays = availability.filter((item) => item?.enabled && Array.isArray(item?.slots) && item.slots.length > 0)
+    if (activeDays.length === 0) return "No available hours set"
+    return `${activeDays.length} day(s) configured`
+  }
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -260,7 +370,7 @@ export default function AdminDashboardPage() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="doctor@gorzo.com"
+                    placeholder="doctor@efoy.com"
                     className="pl-10"
                     value={newDoctor.email}
                     onChange={(e) => setNewDoctor({ ...newDoctor, email: e.target.value })}
@@ -276,12 +386,13 @@ export default function AdminDashboardPage() {
                     type="text"
                     placeholder="Enter temporary password"
                     className="pl-10"
+                    minLength={8}
                     value={newDoctor.tempPassword}
                     onChange={(e) => setNewDoctor({ ...newDoctor, tempPassword: e.target.value })}
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  The doctor will be required to change this on first login
+                  Use at least 8 characters. The doctor will be required to change this on first login.
                 </p>
               </div>
             </div>
@@ -291,9 +402,9 @@ export default function AdminDashboardPage() {
               </Button>
               <Button 
                 onClick={handleAddDoctor}
-                disabled={!newDoctor.name || !newDoctor.email || !newDoctor.tempPassword}
+                disabled={!newDoctor.name || !newDoctor.email || newDoctor.tempPassword.length < 8 || isSavingDoctor}
               >
-                Create Account
+                {isSavingDoctor ? "Creating..." : "Create Account"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -351,11 +462,13 @@ export default function AdminDashboardPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>View Profile</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => void handleViewProfile(doctor.id)}>
+                          View Profile
+                        </DropdownMenuItem>
                         <DropdownMenuItem>Reset Password</DropdownMenuItem>
                         <DropdownMenuItem 
                           className="text-destructive focus:text-destructive"
-                          onClick={() => handleDeleteDoctor(doctor.id)}
+                          onClick={() => void handleDeleteDoctor(doctor.id)}
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
                           Remove Doctor
@@ -378,6 +491,88 @@ export default function AdminDashboardPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Info className="h-4 w-4 text-primary" />
+              Doctor Profile
+            </DialogTitle>
+            <DialogDescription>
+              View detailed account information and availability settings.
+            </DialogDescription>
+          </DialogHeader>
+
+          {isLoadingProfile ? (
+            <div className="py-6 text-sm text-muted-foreground">Loading profile...</div>
+          ) : selectedDoctorProfile ? (
+            <div className="space-y-4 py-2">
+              <div className="flex items-center gap-3 rounded-lg border p-3">
+                <Avatar className="h-12 w-12">
+                  <AvatarFallback className="bg-primary/10 text-primary">
+                    {String(selectedDoctorProfile?.userId?.displayName || "DR")
+                      .split(" ")
+                      .slice(0, 2)
+                      .map((part: string) => part[0])
+                      .join("")
+                      .toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-medium">{selectedDoctorProfile?.userId?.displayName || "Unknown"}</p>
+                  <p className="text-sm text-muted-foreground">{selectedDoctorProfile?.userId?.email || ""}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border p-3">
+                  <p className="text-xs text-muted-foreground">Specialty</p>
+                  <p className="mt-1 text-sm font-medium">{selectedDoctorProfile?.specialization || "N/A"}</p>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <p className="text-xs text-muted-foreground">Verification</p>
+                  <p className="mt-1 text-sm font-medium">{selectedDoctorProfile?.verificationStatus || "N/A"}</p>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <p className="text-xs text-muted-foreground">Role</p>
+                  <p className="mt-1 text-sm font-medium">{selectedDoctorProfile?.userId?.role || "Doctor"}</p>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <p className="text-xs text-muted-foreground">Availability</p>
+                  <p className="mt-1 text-sm font-medium">{getAvailabilityLabel(selectedDoctorProfile?.availability || [])}</p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border p-3">
+                <p className="text-xs text-muted-foreground">Bio</p>
+                <p className="mt-1 text-sm">{selectedDoctorProfile?.bio || "No bio added yet."}</p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="flex items-center gap-2 rounded-lg border p-3 text-sm">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span>
+                    Joined: {selectedDoctorProfile?.createdAt ? new Date(selectedDoctorProfile.createdAt).toLocaleDateString() : "N/A"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 rounded-lg border p-3 text-sm">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span>
+                    Updated: {selectedDoctorProfile?.updatedAt ? new Date(selectedDoctorProfile.updatedAt).toLocaleDateString() : "N/A"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="py-6 text-sm text-muted-foreground">Profile data unavailable.</div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsProfileOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
