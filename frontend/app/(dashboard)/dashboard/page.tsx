@@ -67,20 +67,16 @@ const recentForumActivity = [
 ]
 
 export default function DashboardPage() {
-  const { user, login } = useAuth()
+  const { user } = useAuth()
 
-  // Auto-login for demo - in real app, username comes from registration
-  useEffect(() => {
-    if (!user) {
-      login({
-        id: "1",
-        username: "Selam123",
-        email: "user@example.com",
-        role: "woman",
-        tier: "free",
-      })
-    }
-  }, [user, login])
+  // If you need to refresh the user from the backend you could call an
+  // endpoint like `/api/users/:id` here using the `user?.id` value. That
+  // would replace the static demo login below, but since registration already
+  // logs the backend response into context, nothing extra is required.
+  //
+  // We removed the hard‑coded login so the page displays whatever user the
+  // context currently holds (including the one set during registration).
+
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -148,13 +144,13 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </Link>
-        <Link href="/dashboard/forum">
+        <Link href="/dashboard/chatbot">
           <Card className="group cursor-pointer transition-all hover:border-muted-foreground/30 hover:shadow-md">
             <CardContent className="flex flex-col items-center justify-center p-4">
               <div className="mb-2 rounded-full bg-muted p-3 transition-colors group-hover:bg-muted/80">
                 <MessageSquare className="h-5 w-5 text-muted-foreground" />
               </div>
-              <span className="text-sm font-medium">Ask Community</span>
+              <span className="text-sm font-medium">Chatbot</span>
             </CardContent>
           </Card>
         </Link>

@@ -8,12 +8,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { useAuth } from "@/lib/auth-context"
+import { loginUser } from "@/api/userApi"
 
-// Simulated database of users - in production, this would be an API call
-const usersDatabase = [
-  { username: "admin", password: "admin123", role: "admin", email: "admin@gorzo.com" },
-  { username: "Selam123", password: "user123", role: "woman", email: "selam@example.com" },
-]
+// Note: we no longer use a simulated database; loginUser talks to backend
 
 export default function LoginPage() {
   const router = useRouter()
@@ -25,32 +23,36 @@ export default function LoginPage() {
     password: "",
   })
 
+  const { login } = useAuth()
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError("")
-    
-    // Simulate API call - check against database
-    setTimeout(() => {
-      setIsLoading(false)
-      
-      // Find user in database
-      const user = usersDatabase.find(
-        u => u.username.toLowerCase() === formData.username.toLowerCase() && 
-             u.password === formData.password
-      )
-      
-      if (user) {
-        // Redirect based on user role
-        if (user.role === "admin") {
-          router.push("/admin")
-        } else {
-          router.push("/dashboard")
-        }
-      } else {
-        setError("Invalid username or password")
+
+    try {
+      const res = await loginUser({ email: formData.username, password: formData.password })
+      const backendUser = res.data
+      // convert to frontend user shape
+      const frontendUser = {
+        id: backendUser._id,
+        username: backendUser.displayName,
+        email: backendUser.email,
+        role: backendUser.role === 'User' ? 'woman' : backendUser.role === 'Admin' ? 'admin' : 'doctor',
+        tier: backendUser.isPremium ? 'premium' : 'free',
       }
-    }, 1000)
+      login(frontendUser)
+      if (frontendUser.role === 'admin') {
+        router.push('/admin')
+      } else {
+        router.push('/dashboard')
+      }
+    } catch (err: any) {
+      console.error('login error', err)
+      setError(err?.message || 'Invalid email or password')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -83,13 +85,13 @@ export default function LoginPage() {
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username">Email</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="username"
-                  type="text"
-                  placeholder="Enter your username"
+                  type="email"
+                  placeholder="Enter your email"
                   className="pl-10"
                   value={formData.username}
                   onChange={(e) => setFormData({ ...formData, username: e.target.value })}

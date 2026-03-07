@@ -283,7 +283,7 @@ Save:
   "title": "PCOS Basics Audio",
   "category": "pcos",
   "contentType": "VoiceURL",
-  "voiceUrl": "https://example.com/audio/pcos-basics.mp3",
+  "voiceUrl": "https://example.com//pcos-basics.mp3",
   "audioDuration": 420,
   "transcript": "Welcome to this quick lesson on PCOS...",
   "isPublished": true

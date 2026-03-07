@@ -7,7 +7,8 @@ import { Eye, EyeOff, User, Lock, Stethoscope, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { useAuth } from "@/lib/auth-context"
+import { loginUser } from "@/api/userApi"
 
 export default function DoctorLoginPage() {
   const router = useRouter()
@@ -19,22 +20,41 @@ export default function DoctorLoginPage() {
     password: "",
   })
 
+  const { login } = useAuth()
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError("")
-    
-    // Simulate doctor authentication
-    // In production, this would verify against admin-created credentials
-    setTimeout(() => {
-      setIsLoading(false)
-      // Demo: accept any credentials for now
-      if (formData.username && formData.password) {
-        router.push("/doctor")
-      } else {
-        setError("Invalid credentials. Please contact your administrator.")
+
+    try {
+      const res = await loginUser({ email: formData.username, password: formData.password })
+      const backendUser = res.data
+      
+      // Check if user is a doctor
+      if (backendUser.role !== 'Doctor') {
+        setError("Access denied. This portal is for doctors only.")
+        setIsLoading(false)
+        return
       }
-    }, 1000)
+      
+      // Convert to frontend user shape
+      const frontendUser = {
+        id: backendUser._id,
+        username: backendUser.displayName,
+        email: backendUser.email,
+        role: 'doctor' as const,
+        tier: backendUser.isPremium ? 'premium' : 'free',
+      }
+      
+      login(frontendUser)
+      router.push("/doctor")
+    } catch (err: any) {
+      console.error('doctor login error', err)
+      setError(err?.message || 'Invalid credentials')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -67,13 +87,13 @@ export default function DoctorLoginPage() {
             )}
             
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username">Email</Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="username"
-                  type="text"
-                  placeholder="Enter your username"
+                  type="email"
+                  placeholder="Enter your email"
                   className="pl-10"
                   value={formData.username}
                   onChange={(e) => setFormData({ ...formData, username: e.target.value })}

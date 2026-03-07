@@ -15,12 +15,39 @@ const createUser = asyncHandler(async (req, res) => {
 		displayName: req.body.displayName,
 		email: req.body.email,
 		password: req.body.password,
-		role: "User",
+		role: req.body.role || "User", // Allow specifying role, default to "User"
 		isPremium: Boolean(req.body.isPremium),
 	});
 
 	return res.status(201).json({ success: true, message: "User registered", data: user });
 });
+
+const loginUser = asyncHandler(async (req, res) => {
+	ensureRequiredFields(req.body, ["email", "password"]);
+
+	const email = req.body.email.toLowerCase().trim();
+	const password = req.body.password;
+
+	// For hackathon: create user if doesn't exist, or return existing user
+	let user = await User.findOne({ email });
+	if (!user) {
+		// Create a demo user for hackathon
+		user = await User.create({
+			displayName: email.split('@')[0], // Use part before @ as display name
+			email: email,
+			password: password, // Store password as-is for demo
+			role: "User",
+			isPremium: false,
+		});
+	}
+	
+	// For hackathon: accept any password
+	const userObj = user.toObject();
+	delete userObj.password;
+
+	return res.status(200).json({ success: true, data: userObj });
+});
+
 
 const getUsers = asyncHandler(async (req, res) => {
 	const page = Math.max(Number(req.query.page) || 1, 1);
@@ -81,6 +108,7 @@ const deleteUser = asyncHandler(async (req, res) => {
 
 module.exports = {
 	createUser,
+	loginUser,
 	getUsers,
 	getUserById,
 	updateUser,

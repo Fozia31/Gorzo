@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -16,6 +16,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { useAuth } from "@/lib/auth-context"
+import { getPosts, createPost } from "@/api/postApi"
+import { getComments, createComment } from "@/api/commentApi"
+import { createPostEngagement, getPostEngagements, deletePostEngagement } from "@/api/postEngagementApi"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,57 +36,8 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-// Sample forum posts
-const forumPosts = [
-  {
-    id: 1,
-    username: "BloomingFlower",
-    avatar: "BF",
-    title: "First time experiencing irregular cycles - need advice",
-    content: "Hi sisters, I'm 28 and for the first time my cycle has been very irregular. Last month it was 35 days, this month 24. Should I be worried?",
-    category: "Menstrual Health",
-    likes: 24,
-    comments: 12,
-    timeAgo: "2h ago",
-    isLiked: false,
-  },
-  {
-    id: 2,
-    username: "HopefulMama",
-    avatar: "HM",
-    title: "Natural remedies for menstrual cramps that actually work",
-    content: "After years of struggling, I finally found some natural remedies that help with my cramps. Sharing my experience: 1. Ginger tea with honey 30 min before...",
-    category: "Pain Management",
-    likes: 87,
-    comments: 34,
-    timeAgo: "5h ago",
-    isLiked: true,
-  },
-  {
-    id: 3,
-    username: "WellnessJourney",
-    avatar: "WJ",
-    title: "How do you talk to your partner about fertility?",
-    content: "My husband and I are starting to think about having children. How did you approach the conversation about fertility and timing with your partners?",
-    category: "Relationships",
-    likes: 45,
-    comments: 28,
-    timeAgo: "1d ago",
-    isLiked: false,
-  },
-  {
-    id: 4,
-    username: "StrongSister",
-    avatar: "SS",
-    title: "PCOS diagnosis - feeling overwhelmed",
-    content: "Just got diagnosed with PCOS last week. I'm feeling a bit lost and would love to hear from others who have been through this. What should I expect?",
-    category: "Conditions",
-    likes: 156,
-    comments: 67,
-    timeAgo: "2d ago",
-    isLiked: false,
-  },
-]
+// we will fetch posts from backend; start empty
+const forumPosts: any[] = []
 
 const categories = [
   "All Topics",
@@ -95,46 +50,152 @@ const categories = [
 ]
 
 export default function ForumPage() {
-  const [posts, setPosts] = useState(forumPosts)
+  const { user } = useAuth()
+  const [posts, setPosts] = useState<any[]>([])
   const [selectedCategory, setSelectedCategory] = useState("All Topics")
   const [searchQuery, setSearchQuery] = useState("")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [newPost, setNewPost] = useState({ title: "", content: "", category: "Menstrual Health" })
 
-  const handleLike = (postId: number) => {
-    setPosts(posts.map(post => {
-      if (post.id === postId) {
-        return {
-          ...post,
-          isLiked: !post.isLiked,
-          likes: post.isLiked ? post.likes - 1 : post.likes + 1
-        }
+  const [commentDialogOpen, setCommentDialogOpen] = useState(false)
+  const [currentPostId, setCurrentPostId] = useState<string | null>(null)
+  const [comments, setComments] = useState<any[]>([])
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({})
+  const [commentsMap, setCommentsMap] = useState<Record<string, any[]>>({})
+  const [commentText, setCommentText] = useState("")
+  const [userEngagements, setUserEngagements] = useState<Record<string, any>>({})
+
+  const handleLike = async (postId: string) => {
+    if (!user) {
+      alert("You must be logged in to like posts")
+      return
+    }
+
+    const isCurrentlyLiked = userEngagements[postId]?.type === 'Like'
+
+    try {
+      if (isCurrentlyLiked) {
+        // Unlike: delete the engagement
+        await deletePostEngagement(userEngagements[postId]._id)
+        setUserEngagements(prev => {
+          const newEngagements = { ...prev }
+          delete newEngagements[postId]
+          return newEngagements
+        })
+        setPosts(posts.map(post => 
+          post.id === postId 
+            ? { ...post, isLiked: false, likes: Math.max(0, post.likes - 1) }
+            : post
+        ))
+      } else {
+        // Like: create new engagement
+        const engagement = await createPostEngagement({
+          postId,
+          userId: user.id,
+          type: 'Like'
+        })
+        setUserEngagements(prev => ({
+          ...prev,
+          [postId]: engagement
+        }))
+        setPosts(posts.map(post => 
+          post.id === postId 
+            ? { ...post, isLiked: true, likes: post.likes + 1 }
+            : post
+        ))
       }
-      return post
-    }))
+    } catch (error) {
+      console.error("Failed to toggle like:", error)
+      alert("Failed to update like. Please try again.")
+    }
   }
 
   const handleReport = (postId: number) => {
     alert(`Post ${postId} has been reported. Our moderators will review it.`)
   }
 
-  const handleCreatePost = () => {
-    // In real app, username comes from auth context
-    const post = {
-      id: posts.length + 1,
-      username: "Selam123",
-      avatar: "S1",
-      title: newPost.title,
-      content: newPost.content,
-      category: newPost.category,
-      likes: 0,
-      comments: 0,
-      timeAgo: "Just now",
-      isLiked: false,
+  const handleOpenComments = async (postId: string) => {
+    setCurrentPostId(postId)
+    try {
+      const res = await getComments({ postId })
+      setComments(res || [])
+      setCommentDialogOpen(true)
+    } catch (err) {
+      console.error("failed to load comments", err)
+      alert("Could not load comments")
     }
-    setPosts([post, ...posts])
-    setNewPost({ title: "", content: "", category: "Menstrual Health" })
-    setIsCreateOpen(false)
+  }
+
+  const handleAddComment = async () => {
+    if (!user || !currentPostId) return
+    if (!commentText.trim()) return
+    try {
+      const payload = {
+        postId: currentPostId,
+        userId: user.id,
+        displayName: user.username,
+        content: commentText.trim(),
+      }
+      const res = await createComment(payload)
+      const newC = res
+      setComments([newC, ...comments])
+      // update comment count
+      setCommentCounts(prev => ({ ...prev, [currentPostId]: (prev[currentPostId] || 0) + 1 }))
+      // also update map so previews reflect new comment
+      setCommentsMap(prev => {
+        const arr = prev[currentPostId] ? [newC, ...prev[currentPostId]] : [newC]
+        return { ...prev, [currentPostId]: arr }
+      })
+      // update post preview comments
+      setPosts(prev => prev.map(p => 
+        p.id === currentPostId 
+          ? { ...p, previewComments: [newC, ...(p.previewComments || [])].slice(0, 2) }
+          : p
+      ))
+      setCommentText("")
+    } catch (err) {
+      console.error("add comment error", err)
+      alert("Failed to add comment")
+    }
+  }
+
+  const handleCreatePost = async () => {
+    if (!user) {
+      alert("You must be logged in to post")
+      return
+    }
+
+    try {
+      const payload = {
+        userId: user.id,
+        title: newPost.title,
+        content: newPost.content,
+        category: newPost.category,
+        isAnonymous: false,
+      }
+      const result = await createPost(payload)
+      // API returns the post object directly
+      const post = result
+      // transform for UI
+      const uiPost = {
+        id: post._id,
+        username: user.username,
+        avatar: user.username.slice(0, 2).toUpperCase(),
+        title: post.title,
+        content: post.content,
+        category: post.category,
+        likes: 0,
+        timeAgo: "Just now",
+        isLiked: false,
+      }
+      setPosts([uiPost, ...posts])
+      setCommentCounts(prev => ({ ...prev, [post._id]: 0 }))
+      setNewPost({ title: "", content: "", category: "Menstrual Health" })
+      setIsCreateOpen(false)
+    } catch (err: any) {
+      console.error("create post error", err)
+      alert(err?.message || "Failed to create post")
+    }
   }
 
   const filteredPosts = posts.filter(post => {
@@ -144,6 +205,68 @@ export default function ForumPage() {
     return matchesCategory && matchesSearch
   })
 
+  // fetch all posts when page loads; if user exists we still show every post
+  useEffect(() => {
+    getPosts()
+      .then(res => {
+        const items = res || []
+        const uiItems = items.map((post: any) => {
+          const isMine = user && post.userId === user.id
+          const isLiked = userEngagements[post._id]?.type === 'Like'
+          return {
+            id: post._id,
+            userId: post.userId,
+            username: isMine ? user!.username : "Anonymous",
+            avatar: isMine ? user!.username.slice(0,2).toUpperCase() : "AN",
+            title: post.title,
+            content: post.content,
+            category: post.category,
+            likes: post.likes || 0,
+            timeAgo: new Date(post.createdAt).toLocaleString(),
+            isLiked: isLiked,
+          }
+        })
+        setPosts(uiItems)
+        // fetch all comments to compute counts and previews
+        return getComments().catch(err => {
+          console.error("failed to load comments", err)
+          return []
+        })
+      })
+      .then(cres => {
+        const commentsArray = Array.isArray(cres) ? cres : []
+        const counts: Record<string, number> = {}
+        const map: Record<string, any[]> = {}
+        commentsArray.forEach((c: any) => {
+          counts[c.postId] = (counts[c.postId] || 0) + 1
+          if (!map[c.postId]) map[c.postId] = []
+          map[c.postId].push(c)
+        })
+        setPosts(prev => prev.map(p => ({
+          ...p,
+        })))
+        setCommentsMap(map)
+        setCommentCounts(counts)
+      })
+      .catch(err => {
+        console.error("failed to load posts or comments", err)
+      })
+
+    // Load user engagements
+    if (user) {
+      getPostEngagements()
+        .then(engagements => {
+          const engagementMap: Record<string, any> = {}
+          engagements.forEach((engagement: any) => {
+            engagementMap[engagement.postId] = engagement
+          })
+          setUserEngagements(engagementMap)
+        })
+        .catch(err => {
+          console.error("failed to load engagements", err)
+        })
+    }
+  }, [user])
   return (
     <div className="space-y-6 p-4 md:p-6">
       {/* Header */}
@@ -295,9 +418,9 @@ export default function ForumPage() {
                       <Heart className={cn("h-4 w-4", post.isLiked && "fill-current")} />
                       {post.likes}
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-8 gap-1.5 px-2">
+                    <Button variant="ghost" size="sm" className="h-8 gap-1.5 px-2" onClick={() => handleOpenComments(post.id)}>
                       <MessageCircle className="h-4 w-4" />
-                      {post.comments}
+                      {commentCounts[post.id] || 0}
                     </Button>
                   </div>
                 </div>
@@ -306,6 +429,37 @@ export default function ForumPage() {
           </Card>
         ))}
       </div>
+
+      {/* comment dialog */}
+      <Dialog open={commentDialogOpen} onOpenChange={setCommentDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Comments</DialogTitle>
+            <DialogDescription>
+              Read and add comments to this post.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 max-h-64 overflow-y-auto">
+            {comments.map(c => (
+              <div key={c._id} className="border-b pb-2">
+                <p className="text-sm font-medium">{c.displayName}</p>
+                <p className="text-sm">{c.content}</p>
+              </div>
+            ))}
+            {comments.length === 0 && <p className="text-sm text-muted-foreground">No comments yet.</p>}
+          </div>
+          <div className="mt-4 space-y-2">
+            <Textarea
+              placeholder="Write a comment..."
+              value={commentText}
+              onChange={e => setCommentText(e.target.value)}
+            />
+            <Button onClick={handleAddComment} disabled={!commentText.trim()}>
+              Submit
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

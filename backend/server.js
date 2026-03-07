@@ -18,9 +18,22 @@ dotenv.config();
 
 const app = express();
 
+// Configure CORS to allow the frontend(s) used during development and production
+const allowedOrigins = [];
+if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL);
+// always allow localhost for dev
+allowedOrigins.push("http://localhost:3000");
+
 app.use(
 	cors({
-		origin: process.env.FRONTEND_URL || "*",
+		origin: (origin, callback) => {
+			// allow requests with no origin (e.g. mobile apps, curl)
+			if (!origin) return callback(null, true);
+			if (allowedOrigins.includes(origin)) {
+				return callback(null, true);
+			}
+			callback(new Error("CORS policy: origin not allowed"));
+		},
 	})
 );
 app.use(express.json());

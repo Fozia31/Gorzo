@@ -2,6 +2,11 @@ const mongoose = require("mongoose");
 
 const commentSchema = new mongoose.Schema(
 	{
+		// legacy index for comments created earlier – keep field to satisfy DB
+		comment_id: {
+			type: String,
+			default: () => new mongoose.Types.ObjectId().toString(),
+		},
 		postId: {
 			type: mongoose.Schema.Types.ObjectId,
 			ref: "Post",
@@ -32,6 +37,7 @@ const commentSchema = new mongoose.Schema(
 			default: false,
 		},
 	},
+
 	{
 		timestamps: true,
 	}
