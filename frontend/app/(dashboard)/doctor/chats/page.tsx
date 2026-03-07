@@ -131,6 +131,23 @@ function ChatView({ chat, onBack }: { chat: typeof chatQueue[0], onBack: () => v
       setSendError("Sorry, your message could not be sent. Please try again.")
       return
     }
+    // Gemini AI integration: send prompt and get response
+    try {
+      const aiRes = await chatApi.sendGeminiMessage({ userId: chat.id, prompt: message.trim() })
+      if (aiRes && aiRes.response) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now(),
+            sender: 'ai',
+            content: aiRes.response,
+            time: new Date().toLocaleTimeString(),
+          },
+        ])
+      }
+    } catch (e) {
+      setSendError("AI response failed. Please try again.")
+    }
     setMessage("")
   }
 

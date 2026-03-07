@@ -71,4 +71,46 @@ module.exports = {
 	getAIConversationById,
 	updateAIConversation,
 	deleteAIConversation,
+	// Gemini chatbot integration
+	geminiChat: asyncHandler(async (req, res) => {
+		const { userId, prompt } = req.body;
+		if (!userId || !prompt) {
+			throw new ApiError(400, "userId and prompt are required");
+		}
+
+		// Custom legal and honest reference prompt
+		const customPrompt = `You are a medical assistant chatbot. Always provide legal, honest, and referenced information. If you don't know, say so.\n\nUser prompt: ${prompt}`;
+
+		// Gemini API integration using axios
+		const axios = require("axios");
+		const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+		let geminiResponse = "";
+		try {
+			const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta1/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
+			const apiRes = await axios.post(geminiApiUrl, {
+				contents: [{ parts: [{ text: customPrompt }] }]
+			});
+			geminiResponse = apiRes.data?.candidates?.[0]?.content?.parts?.[0]?.text || "No response from Gemini.";
+		} catch (err) {
+			geminiResponse = "Gemini API error: " + (err.response?.data?.error?.message || err.message);
+		}
+
+		// Save conversation
+		let conversation = await AIConversation.findOne({ userId });
+		if (!conversation) {
+			conversation = await AIConversation.create({
+				userId,
+				history: [{ prompt, summaryResponse: geminiResponse }],
+				lastPrompt: prompt,
+				lastSummaryResponse: geminiResponse,
+			});
+		} else {
+			conversation.history.push({ prompt, summaryResponse: geminiResponse });
+			conversation.lastPrompt = prompt;
+			conversation.lastSummaryResponse = geminiResponse;
+			await conversation.save();
+		}
+
+		return res.status(200).json({ success: true, response: geminiResponse, conversation });
+	}),
 };

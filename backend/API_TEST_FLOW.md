@@ -506,6 +506,48 @@ Use this order to avoid dangling test references:
 
 ---
 
+## 10) Gemini Chatbot API (AI Conversation with Gemini)
+
+### Send Gemini Chatbot Prompt
+- POST `/api/ai-conversations/gemini`
+
+**Request:**
+```json
+{
+  "userId": "USER_ID",
+  "prompt": "What are safe remedies for menstrual cramps?"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "response": "Safe remedies include hydration, rest, heat pads, and consulting a doctor if pain worsens. Always follow legal and honest medical advice.",
+  "conversation": {
+    "_id": "AI_CONVERSATION_ID",
+    "userId": "USER_ID",
+    "history": [
+      {
+        "prompt": "What are safe remedies for menstrual cramps?",
+        "summaryResponse": "Safe remedies include hydration, rest, heat pads, and consulting a doctor if pain worsens. Always follow legal and honest medical advice."
+      }
+    ],
+    ...other fields...
+  }
+}
+```
+
+**Error Example:**
+```json
+{
+  "success": false,
+  "message": "Gemini API error: ..."
+}
+```
+
+---
+
 ## Common quick checks
 
 - Invalid ID test:

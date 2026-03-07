@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useEffect, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import {
   Home,
@@ -54,6 +55,11 @@ export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { user, logout } = useAuth()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const handleLogout = () => {
     logout()
@@ -100,7 +106,6 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     asChild
                     isActive={pathname === item.href}
-                    tooltip={item.title}
                   >
                     <Link href={item.href}>
                       <item.icon className="size-4" />
@@ -116,7 +121,7 @@ export function AppSidebar() {
 
       <SidebarFooter className="p-4">
         <SidebarSeparator className="mb-4" />
-        {user && (
+        {mounted && user && (
           <div className="flex items-center gap-3">
             <Avatar className="h-9 w-9 border-2 border-sidebar-accent">
               <AvatarImage src={user.avatar} alt={user.username} />
@@ -140,7 +145,6 @@ export function AppSidebar() {
             <SidebarMenuButton
               onClick={handleLogout}
               className="ml-auto h-8 w-8 shrink-0"
-              tooltip="Sign Out"
             >
               <LogOut className="size-4" />
             </SidebarMenuButton>

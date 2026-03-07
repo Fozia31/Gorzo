@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, ReactNode } from "react"
+import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react"
 import { registerUser } from "../api/userApi"
 
 export type UserRole = "woman" | "doctor" | "admin" | null
@@ -27,38 +27,49 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
+  const [user, setUser] = useState<User | null>(null)
+
+  useEffect(() => {
     try {
       const stored = localStorage.getItem("auth_user")
-      return stored ? (JSON.parse(stored) as User) : null
+      if (stored) {
+        setUser(JSON.parse(stored) as User)
+      }
     } catch {
-      return null
+      // ignore storage errors
     }
-  })
+  }, [])
 
-  const login = (userData: User) => {
+  const login = useCallback((userData: User) => {
     setUser(userData)
     try {
       localStorage.setItem("auth_user", JSON.stringify(userData))
     } catch {
       // ignore storage errors
     }
-  }
+  }, [])
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setUser(null)
     try {
       localStorage.removeItem("auth_user")
     } catch {
       // ignore storage errors
     }
-  }
+  }, [])
 
-  const updateTier = (tier: SubscriptionTier) => {
-    if (user) {
-      setUser({ ...user, tier })
-    }
-  }
+  const updateTier = useCallback((tier: SubscriptionTier) => {
+    setUser((prev) => {
+      if (!prev || prev.tier === tier) return prev
+      const next = { ...prev, tier }
+      try {
+        localStorage.setItem("auth_user", JSON.stringify(next))
+      } catch {
+        // ignore storage errors
+      }
+      return next
+    })
+  }, [])
 
   const register = async (userData: { displayName: string; email: string; password: string; isPremium?: boolean }) => {
     const response = await registerUser(userData);

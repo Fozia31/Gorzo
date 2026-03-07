@@ -58,13 +58,12 @@ const aiConversationSchema = new mongoose.Schema(
 	}
 );
 
-aiConversationSchema.pre("save", function updateConversationSummary(next) {
+aiConversationSchema.pre("save", function updateConversationSummary() {
 	if (this.history.length > 0) {
 		const latest = this.history[this.history.length - 1];
 		this.lastPrompt = latest.prompt;
 		this.lastSummaryResponse = latest.summaryResponse;
 	}
-	next();
 });
 
 aiConversationSchema.index({ userId: 1, updatedAt: -1 });

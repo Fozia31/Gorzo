@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { Suspense, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -49,7 +49,7 @@ const plans = [
   },
 ]
 
-export default function PaymentPage() {
+function PaymentPageContent() {
   const searchParams = useSearchParams()
   const doctorId = searchParams.get("doctor")
   
@@ -397,5 +397,13 @@ export default function PaymentPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function PaymentPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading payment options...</div>}>
+      <PaymentPageContent />
+    </Suspense>
   )
 }
