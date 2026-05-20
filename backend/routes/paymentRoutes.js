@@ -1,18 +1,16 @@
 const express = require("express");
 const {
-  validatePromoCode,
-  initiateMpesaPayment,
-  getPaymentStatus,
-  mpesaCallback,
-  checkDoctorAccess,
+	initiatePayment,
+	paymentCallback,
+	getPaymentStatus,
+	getConsultationAccess,
 } = require("../controller/paymentController");
 
 const router = express.Router();
 
-router.post("/promo/validate", validatePromoCode);
-router.post("/mpesa/initiate", initiateMpesaPayment);
-router.post("/mpesa/callback", mpesaCallback);
-router.get("/access", checkDoctorAccess);
-router.get("/:paymentId/status", getPaymentStatus);
+router.post("/initiate", initiatePayment);
+router.post("/callback", paymentCallback);
+router.get("/:transactionId/status", getPaymentStatus);
+router.get("/consultation-access/:doctorId", getConsultationAccess);
 
 module.exports = router;

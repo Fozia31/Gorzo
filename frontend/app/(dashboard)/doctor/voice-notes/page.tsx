@@ -133,13 +133,25 @@ export default function VoiceNotesPage() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
-    const loadDoctorRecordId = async () => {
-      if (!userId) return
-      try {
-        const doctor = await getDoctorByUserId(userId)
-        if (doctor?._id) setDoctorRecordId(String(doctor._id))
-      } catch {
-        setDoctorRecordId("")
+    if (!user) {
+      login({
+        id: "2",
+        username: "Dr. Amara",
+        email: "doctor@efoy.com",
+        role: "doctor",
+      })
+    }
+  }, [user, login])
+
+  // Recording timer
+  useEffect(() => {
+    if (isRecording) {
+      timerRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1)
+      }, 1000)
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
       }
     }
 

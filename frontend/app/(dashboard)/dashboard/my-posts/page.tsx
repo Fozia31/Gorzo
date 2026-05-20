@@ -1,12 +1,11 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   Dialog,
@@ -43,31 +42,52 @@ import {
   Trash2,
   FileText,
   Eye,
-  CircleAlert,
-  CheckCircle2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
-import { useAuth } from "@/lib/auth-context"
-import { deletePost, getPosts, updatePost } from "@/api/postApi"
 
-type MyPost = {
-  id: string
-  username: string
-  avatar: string
-  title: string
-  content: string
-  category: string
-  likes: number
-  comments: number
-  timeAgo: string
-  createdAt: string
-}
-
-type PageMessage = {
-  type: "success" | "error"
-  text: string
-}
+// Sample user's posts
+const initialUserPosts = [
+  {
+    id: 1,
+    username: "Selam123",
+    avatar: "S1",
+    title: "My experience with endometriosis diagnosis",
+    content: "After years of unexplained pain, I finally got diagnosed with endometriosis. I want to share my journey and what helped me get the right diagnosis. The key was finding a doctor who actually listened...",
+    category: "Conditions",
+    likes: 45,
+    comments: 23,
+    timeAgo: "3d ago",
+    createdAt: "2024-01-15",
+    isLiked: false,
+  },
+  {
+    id: 2,
+    username: "Selam123",
+    avatar: "S1",
+    title: "Natural supplements that helped my hormonal balance",
+    content: "I've been struggling with hormonal imbalance for a while. After consulting with my doctor, I started taking some supplements that really helped. Here's what worked for me...",
+    category: "Hormones",
+    likes: 67,
+    comments: 31,
+    timeAgo: "1w ago",
+    createdAt: "2024-01-10",
+    isLiked: false,
+  },
+  {
+    id: 3,
+    username: "Selam123",
+    avatar: "S1",
+    title: "How I manage anxiety during my cycle",
+    content: "Does anyone else experience heightened anxiety before their period? I've developed some coping strategies that have been really helpful. Would love to hear what works for others too.",
+    category: "Mental Health",
+    likes: 89,
+    comments: 42,
+    timeAgo: "2w ago",
+    createdAt: "2024-01-03",
+    isLiked: false,
+  },
+]
 
 const categories = [
   "Menstrual Health",
@@ -81,51 +101,13 @@ const categories = [
 ]
 
 export default function MyPostsPage() {
-  const { user } = useAuth()
-  const [posts, setPosts] = useState<MyPost[]>([])
-  const [loading, setLoading] = useState(true)
+  const [posts, setPosts] = useState(initialUserPosts)
   const [searchQuery, setSearchQuery] = useState("")
-  const [editingPost, setEditingPost] = useState<MyPost | null>(null)
-  const [deletingPostId, setDeletingPostId] = useState<string | null>(null)
+  const [editingPost, setEditingPost] = useState<typeof initialUserPosts[0] | null>(null)
+  const [deletingPostId, setDeletingPostId] = useState<number | null>(null)
   const [editForm, setEditForm] = useState({ title: "", content: "", category: "" })
-  const [pageMessage, setPageMessage] = useState<PageMessage | null>(null)
 
-  const fetchMyPosts = async () => {
-    if (!user?.id) {
-      setPosts([])
-      setLoading(false)
-      return
-    }
-
-    try {
-      setLoading(true)
-      const data = await getPosts({ userId: user.id })
-      const mapped = (data || []).map((post: any) => ({
-        id: post._id,
-        username: user.username,
-        avatar: user.username.slice(0, 2).toUpperCase(),
-        title: post.title,
-        content: post.content,
-        category: post.category,
-        likes: post.likes || 0,
-        comments: 0,
-        timeAgo: new Date(post.createdAt).toLocaleString(),
-        createdAt: post.createdAt,
-      }))
-      setPosts(mapped)
-    } catch (error) {
-      console.error("Failed to load user posts", error)
-      setPageMessage({ type: "error", text: "Failed to load your posts" })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchMyPosts()
-  }, [user?.id])
-
-  const handleEdit = (post: MyPost) => {
+  const handleEdit = (post: typeof initialUserPosts[0]) => {
     setEditingPost(post)
     setEditForm({
       title: post.title,
@@ -134,57 +116,32 @@ export default function MyPostsPage() {
     })
   }
 
-  const handleSaveEdit = async () => {
+  const handleSaveEdit = () => {
     if (!editingPost) return
-
-    try {
-      const updated = await updatePost(editingPost.id, {
-        title: editForm.title,
-        content: editForm.content,
-        category: editForm.category,
-      })
-
-      setPosts((prev) =>
-        prev.map((post) =>
-          post.id === editingPost.id
-            ? {
-                ...post,
-                title: updated.title,
-                content: updated.content,
-                category: updated.category,
-              }
-            : post
-        )
-      )
-      setEditingPost(null)
-      setEditForm({ title: "", content: "", category: "" })
-      setPageMessage({ type: "success", text: "Post updated successfully." })
-    } catch (error) {
-      console.error("Failed to update post", error)
-      setPageMessage({ type: "error", text: "Failed to update post" })
-    }
+    
+    setPosts(posts.map(post => {
+      if (post.id === editingPost.id) {
+        return {
+          ...post,
+          title: editForm.title,
+          content: editForm.content,
+          category: editForm.category,
+        }
+      }
+      return post
+    }))
+    setEditingPost(null)
+    setEditForm({ title: "", content: "", category: "" })
   }
 
-  const handleDelete = async (postId: string) => {
-    try {
-      await deletePost(postId)
-      setPosts((prev) => prev.filter((post) => post.id !== postId))
-      setDeletingPostId(null)
-      setPageMessage({ type: "success", text: "Post deleted successfully." })
-    } catch (error) {
-      console.error("Failed to delete post", error)
-      setPageMessage({ type: "error", text: "Failed to delete post" })
-    }
+  const handleDelete = (postId: number) => {
+    setPosts(posts.filter(post => post.id !== postId))
+    setDeletingPostId(null)
   }
 
-  const filteredPosts = useMemo(
-    () =>
-      posts.filter(
-        (post) =>
-          post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          post.content.toLowerCase().includes(searchQuery.toLowerCase())
-      ),
-    [posts, searchQuery]
+  const filteredPosts = posts.filter(post => 
+    post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    post.content.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   return (
@@ -206,24 +163,6 @@ export default function MyPostsPage() {
           </Button>
         </Link>
       </div>
-
-      {pageMessage && (
-        <Alert
-          variant={pageMessage.type === "error" ? "destructive" : "default"}
-          className={
-            pageMessage.type === "success"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-900 [&>svg]:text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200"
-              : ""
-          }
-        >
-          {pageMessage.type === "error" ? (
-            <CircleAlert className="h-4 w-4" />
-          ) : (
-            <CheckCircle2 className="h-4 w-4" />
-          )}
-          <AlertDescription>{pageMessage.text}</AlertDescription>
-        </Alert>
-      )}
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
@@ -278,13 +217,7 @@ export default function MyPostsPage() {
       </div>
 
       {/* Posts List */}
-      {loading ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <p className="text-sm text-muted-foreground">Loading your posts...</p>
-          </CardContent>
-        </Card>
-      ) : filteredPosts.length === 0 ? (
+      {filteredPosts.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <div className="rounded-full bg-muted p-4 mb-4">

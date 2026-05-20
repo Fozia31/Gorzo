@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import * as chatApi from "@/api/chatApi"
+import { getConsultationAccess } from "@/api/paymentApi"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -31,8 +33,7 @@ import {
   Trash2,
   AlertTriangle,
   Plus,
-  Lock,
-  CircleAlert,
+  Lock
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
@@ -55,121 +56,117 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 
-type DayName = "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday"
-type AvailabilityRecord = Record<DayName, { enabled: boolean; slots: { start: string; end: string }[] }>
-
-type DoctorReview = {
-  id: string | number
-  user: string
-  rating: number
-  comment: string
-  date: string
-}
-
-type DoctorProfile = {
-  id: string | number
-  doctorRecordId: string
-  userId: string
-  name: string
-  specialty: string
-  avatar: string
-  rating: number
-  totalReviews: number
-  available: boolean
-  responseTime: string
-  experience: string
-  bio: string
-  consultationFee: number
-  availability: AvailabilityRecord
-  reviews: DoctorReview[]
-}
-
-const availabilityDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const
-
-const emptyAvailability = {
-  Monday: { enabled: false, slots: [] },
-  Tuesday: { enabled: false, slots: [] },
-  Wednesday: { enabled: false, slots: [] },
-  Thursday: { enabled: false, slots: [] },
-  Friday: { enabled: false, slots: [] },
-  Saturday: { enabled: false, slots: [] },
-  Sunday: { enabled: false, slots: [] },
-}
-
-const toAvailabilityRecord = (items: Array<{ day: string; enabled: boolean; slots: { start: string; end: string }[] }>) => {
-  const record = { ...emptyAvailability }
-  for (const item of items || []) {
-    if (record[item.day as keyof typeof record]) {
-      record[item.day as keyof typeof record] = {
-        enabled: Boolean(item.enabled),
-        slots: Array.isArray(item.slots) ? item.slots : [],
-      }
-    }
-  }
-  return record
-}
-
-const hasAnyAvailability = (availability: AvailabilityRecord) =>
-  availabilityDays.some((day) => availability[day].enabled && availability[day].slots.length > 0)
-
-const mapBackendDoctorsToUi = (backendDoctors: any[]) => {
-  return backendDoctors.map((item: any, index: number) => {
-    const displayName = item?.userId?.displayName || "Doctor"
-    const specialty = item?.specialization || "General Practitioner"
-
-    const availability = Array.isArray(item?.availability)
-      ? toAvailabilityRecord(item.availability)
-      : { ...emptyAvailability }
-    const available = hasAnyAvailability(availability)
-
-    return {
-      id: index + 1,
-      doctorRecordId: String(item?._id || ""),
-      userId: String(item?.userId?._id || ""),
-      name: displayName,
-      specialty,
-      avatar: item?.userId?.avatar || "/logo.jpg",
-      rating: 0,
-      totalReviews: 0,
-      available,
-      responseTime: available ? "Usually responds in a few hours" : "Currently unavailable",
-      experience: item?.createdAt ? `${Math.max(new Date().getFullYear() - new Date(item.createdAt).getFullYear(), 1)} years` : "N/A",
-      bio: item?.bio || "No bio provided yet.",
-      consultationFee: Number(item?.consultationFee || 299),
-      availability,
-      reviews: [],
-    }
-  })
-}
-
-const mapBackendReviewDate = (dateValue: string | Date | undefined) => {
-  if (!dateValue) return "recently"
-  const date = new Date(dateValue)
-  const diffMs = Date.now() - date.getTime()
-  const minutes = Math.floor(diffMs / (1000 * 60))
-  if (minutes < 1) return "just now"
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  if (days < 30) return `${days} day${days > 1 ? "s" : ""} ago`
-  const months = Math.floor(days / 30)
-  return `${months} month${months > 1 ? "s" : ""} ago`
-}
-
-const REVIEWS_PAGE_SIZE = 5
-
-const mapRatingsToReviews = (items: any[], doctorId: string | number) =>
-  Array.isArray(items)
-    ? items.map((item: any, index: number) => ({
-        id: item.id || `${doctorId}-${index}`,
-        user: item.user || "Anonymous User",
-        rating: Number(item.rating || 0),
-        comment: item.comment || "",
-        date: mapBackendReviewDate(item.date),
-      }))
-    : []
-
+// Sample doctors with ratings, reviews, and availability
+const doctors = [
+  {
+    id: 1,
+    name: "Dr. Amara Bekele",
+    specialty: "Gynecologist",
+    avatar: "/doctors/amara.jpg",
+    rating: 4.9,
+    totalReviews: 156,
+    available: true,
+    responseTime: "Usually responds in 2 hours",
+    experience: "12 years",
+    bio: "Specialized in women's reproductive health, pregnancy care, and hormonal disorders.",
+    consultationFee: 299,
+    availability: {
+      Monday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }, { start: "14:00", end: "17:00" }] },
+      Tuesday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }, { start: "14:00", end: "17:00" }] },
+      Wednesday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }] },
+      Thursday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }, { start: "14:00", end: "17:00" }] },
+      Friday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }] },
+      Saturday: { enabled: false, slots: [] },
+      Sunday: { enabled: false, slots: [] },
+    },
+    reviews: [
+      { id: 1, user: "Anonymous User", rating: 5, comment: "Very professional and caring. Made me feel comfortable discussing sensitive topics.", date: "2 weeks ago" },
+      { id: 2, user: "HealthyMama22", rating: 5, comment: "Dr. Amara helped me understand my cycle better. Highly recommend!", date: "1 month ago" },
+      { id: 3, user: "WellnessJourney", rating: 4, comment: "Good advice, though response took a bit longer than expected.", date: "1 month ago" },
+    ]
+  },
+  {
+    id: 2,
+    name: "Dr. Selam Haile",
+    specialty: "Nutritionist",
+    avatar: "/doctors/selam.jpg",
+    rating: 4.8,
+    totalReviews: 98,
+    available: true,
+    responseTime: "Usually responds in 3 hours",
+    experience: "8 years",
+    bio: "Expert in women's nutrition, weight management, and dietary planning for hormonal balance.",
+    consultationFee: 249,
+    availability: {
+      Monday: { enabled: true, slots: [{ start: "10:00", end: "13:00" }, { start: "15:00", end: "18:00" }] },
+      Tuesday: { enabled: true, slots: [{ start: "10:00", end: "13:00" }] },
+      Wednesday: { enabled: true, slots: [{ start: "10:00", end: "13:00" }, { start: "15:00", end: "18:00" }] },
+      Thursday: { enabled: true, slots: [{ start: "10:00", end: "13:00" }] },
+      Friday: { enabled: true, slots: [{ start: "10:00", end: "13:00" }, { start: "15:00", end: "18:00" }] },
+      Saturday: { enabled: true, slots: [{ start: "10:00", end: "14:00" }] },
+      Sunday: { enabled: false, slots: [] },
+    },
+    reviews: [
+      { id: 1, user: "FitnessFocus", rating: 5, comment: "Her meal plans are practical and easy to follow. Lost 5kg in 2 months!", date: "3 weeks ago" },
+      { id: 2, user: "BusyMom123", rating: 5, comment: "Finally found a nutritionist who understands Ethiopian food culture.", date: "1 month ago" },
+      { id: 3, user: "Anonymous User", rating: 4, comment: "Very knowledgeable. Helped me with my PCOS diet.", date: "2 months ago" },
+    ]
+  },
+  {
+    id: 3,
+    name: "Dr. Hana Tadesse",
+    specialty: "Reproductive Health",
+    avatar: "/doctors/hana.jpg",
+    rating: 4.9,
+    totalReviews: 124,
+    available: false,
+    responseTime: "Currently unavailable",
+    experience: "15 years",
+    bio: "Specializes in fertility, family planning, and reproductive disorders.",
+    consultationFee: 349,
+    availability: {
+      Monday: { enabled: false, slots: [] },
+      Tuesday: { enabled: false, slots: [] },
+      Wednesday: { enabled: false, slots: [] },
+      Thursday: { enabled: false, slots: [] },
+      Friday: { enabled: false, slots: [] },
+      Saturday: { enabled: false, slots: [] },
+      Sunday: { enabled: false, slots: [] },
+    },
+    reviews: [
+      { id: 1, user: "HopefulMother", rating: 5, comment: "Dr. Hana gave me hope when I was struggling with fertility issues.", date: "1 week ago" },
+      { id: 2, user: "Anonymous User", rating: 5, comment: "Extremely compassionate and thorough. Best doctor I've consulted.", date: "3 weeks ago" },
+      { id: 3, user: "NewMom2024", rating: 5, comment: "She guided me through my entire pregnancy journey.", date: "2 months ago" },
+    ]
+  },
+  {
+    id: 4,
+    name: "Dr. Meron Alemu",
+    specialty: "Mental Health",
+    avatar: "/doctors/meron.jpg",
+    rating: 4.7,
+    totalReviews: 89,
+    available: true,
+    responseTime: "Usually responds in 4 hours",
+    experience: "10 years",
+    bio: "Specializes in women's mental health, postpartum depression, and anxiety disorders.",
+    consultationFee: 279,
+    availability: {
+      Monday: { enabled: true, slots: [{ start: "08:00", end: "12:00" }] },
+      Tuesday: { enabled: true, slots: [{ start: "08:00", end: "12:00" }, { start: "14:00", end: "16:00" }] },
+      Wednesday: { enabled: false, slots: [] },
+      Thursday: { enabled: true, slots: [{ start: "08:00", end: "12:00" }, { start: "14:00", end: "16:00" }] },
+      Friday: { enabled: true, slots: [{ start: "08:00", end: "12:00" }] },
+      Saturday: { enabled: false, slots: [] },
+      Sunday: { enabled: false, slots: [] },
+    },
+    reviews: [
+      { id: 1, user: "Anonymous User", rating: 5, comment: "Finally someone who understands the mental load women carry.", date: "1 week ago" },
+      { id: 2, user: "StrongWoman", rating: 4, comment: "Helpful sessions, though I wish there were more follow-ups.", date: "1 month ago" },
+      { id: 3, user: "NewMomStruggles", rating: 5, comment: "Helped me through postpartum anxiety. Forever grateful.", date: "6 weeks ago" },
+    ]
+  },
+]
 // Chat Room type
 type ChatRoom = {
   id: string
@@ -380,7 +377,7 @@ function RatingDialog({
 }
 
 // Helper function to get availability summary
-function getAvailabilitySummary(availability: AvailabilityRecord) {
+function getAvailabilitySummary(availability: typeof doctors[0]["availability"]) {
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
   const shortDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
   const availableDays = days.filter(day => availability[day]?.enabled)
@@ -400,17 +397,11 @@ function DoctorProfileView({
   onBack, 
   onContact,
   hasPaidAccess,
-  onLoadMoreReviews,
-  canLoadMoreReviews,
-  isLoadingReviews,
 }: { 
   doctor: DoctorProfile
   onBack: () => void
   onContact: () => void
   hasPaidAccess: boolean
-  onLoadMoreReviews: () => void
-  canLoadMoreReviews: boolean
-  isLoadingReviews: boolean
 }) {
   const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
   const shortDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -615,10 +606,10 @@ function PaymentDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Crown className="h-5 w-5 text-primary" />
-            Mock Payment for Consultation
+            Pay for Consultation
           </DialogTitle>
           <DialogDescription>
-            Frontend demo payment to access chat with {doctor.name}
+            One-time payment to access chat with {doctor.name}
           </DialogDescription>
         </DialogHeader>
         
@@ -664,15 +655,12 @@ function PaymentDialog({
 
           <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
             <Shield className="h-3 w-3" />
-            <span>Mock M-Pesa demo (frontend only)</span>
+            <span>Secure payment via M-Pesa Ethiopia</span>
           </div>
         </div>
 
         <div className="flex flex-col gap-2">
-          <Link
-            href={`/dashboard/payment?doctor=${encodeURIComponent(String(doctor.id))}&doctorRecordId=${encodeURIComponent(doctor.doctorRecordId)}&doctorName=${encodeURIComponent(doctor.name)}&specialty=${encodeURIComponent(doctor.specialty)}&rating=${encodeURIComponent(String(doctor.rating))}&avatar=${encodeURIComponent(doctor.avatar || "/logo.jpg")}&amount=${encodeURIComponent(String(doctor.consultationFee))}`}
-            className="w-full"
-          >
+          <Link href={`/dashboard/payment?doctor=${doctor.id}&amount=${doctor.consultationFee}`} className="w-full">
             <Button className="w-full gap-2">
               <Sparkles className="h-4 w-4" />
               Pay {doctor.consultationFee} ETB
@@ -720,9 +708,18 @@ function ChatRoomView({
       await onSendMessage(message.trim())
       setMessage("")
     }
+    // Save to DB via chatApi
+    try {
+      await chatApi.sendMessage(newMsg)
+    } catch (e) {
+      setSendError("Sorry, your message could not be sent. Please try again.")
+      return
+    }
+    setMessage("")
   }
 
   const handleClearHistory = () => {
+    setMessages([])
     onClearHistory()
     setShowClearDialog(false)
   }
@@ -842,8 +839,6 @@ function ChatRoomView({
 // Main Consulting Page
 export default function ConsultingPage() {
   const { user } = useAuth()
-  const [doctorsList, setDoctorsList] = useState<DoctorProfile[]>([])
-  const paymentHandledRef = useRef(false)
   
   const [view, setView] = useState<"list" | "profile" | "chat">("list")
   const [selectedDoctor, setSelectedDoctor] = useState<DoctorProfile | null>(null)
@@ -856,23 +851,117 @@ export default function ConsultingPage() {
   const [isLoadingChats, setIsLoadingChats] = useState(false)
   const [isSendingMessage, setIsSendingMessage] = useState(false)
   
-  // Track paid consultations based on backend chats.
+  // Server-backed access per doctor
   const [paidDoctorIds, setPaidDoctorIds] = useState<number[]>([])
   
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([])
-  const [pageMessage, setPageMessage] = useState<PageMessage | null>(null)
 
-  const upsertLocalChatRoom = (doctor: DoctorProfile) => {
-    const localChatId = `local-${String(doctor.id)}`
-    return upsertChatRoom(localChatId, doctor, new Date())
+  useEffect(() => {
+    if (!user?.id) {
+      setPaidDoctorIds([])
+      return
+    }
+
+    const loadAccess = async () => {
+      const checks = await Promise.all(
+        doctors.map(async (doctor) => {
+          try {
+            const response = await getConsultationAccess({
+              userId: user.id,
+              doctorId: String(doctor.id),
+            })
+            return response?.data?.hasAccess ? doctor.id : null
+          } catch {
+            return null
+          }
+        })
+      )
+      setPaidDoctorIds(checks.filter((id): id is number => id !== null))
+    }
+
+    loadAccess()
+  }, [user?.id])
+
+  // Auto-handle payment success
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("payment") === "success") {
+      const doctorId = params.get("doctor")
+      if (doctorId && user?.id) {
+        const docId = parseInt(doctorId)
+        const doctor = doctors.find(d => d.id === docId)
+        ;(async () => {
+          if (!doctor) return
+          try {
+            const response = await getConsultationAccess({
+              userId: user.id,
+              doctorId: String(docId),
+            })
+            const hasAccess = Boolean(response?.data?.hasAccess)
+            if (!hasAccess) return
+
+            setPaidDoctorIds((prev) => (prev.includes(docId) ? prev : [...prev, docId]))
+            let roomToOpen: ChatRoom | null = null
+            setChatRooms((prev) => {
+              const existingRoom = prev.find((r) => r.doctor.id === docId)
+              if (existingRoom) {
+                roomToOpen = existingRoom
+                return prev
+              }
+              const newRoom: ChatRoom = {
+                id: `chat-${Date.now()}`,
+                doctor,
+                createdAt: "Just now",
+                messages: [],
+              }
+              roomToOpen = newRoom
+              return [newRoom, ...prev]
+            })
+            if (roomToOpen) {
+              setSelectedChatRoom(roomToOpen)
+              setSelectedDoctor(doctor)
+              setView("chat")
+            }
+          } catch {
+            // no-op: keep user on consulting page if access check fails
+          }
+        })()
+      }
+      // Clear URL params
+      window.history.replaceState({}, '', '/dashboard/consulting')
+    }
+  }, [user?.id])
+
+  const hasPaidForDoctor = (doctorId: number) => paidDoctorIds.includes(doctorId)
+
+  const handleDoctorClick = (doctor: typeof doctors[0]) => {
+    setSelectedDoctor(doctor)
+    setView("profile")
   }
 
-  const upsertChatRoom = (chatId: string, doctor: DoctorProfile, createdAt?: string | Date) => {
-    const room: ChatRoom = {
-      id: chatId,
-      doctor,
-      createdAt: formatChatTime(createdAt),
-      messages: [],
+  const handleContactDoctor = () => {
+    if (!selectedDoctor) return
+    
+    if (hasPaidForDoctor(selectedDoctor.id)) {
+      // Check if chat room exists
+      const existingRoom = chatRooms.find(r => r.doctor.id === selectedDoctor.id)
+      if (existingRoom) {
+        setSelectedChatRoom(existingRoom)
+        setView("chat")
+      } else {
+        // Create new chat room
+        const newRoom: ChatRoom = {
+          id: `chat-${Date.now()}`,
+          doctor: selectedDoctor,
+          createdAt: "Just now",
+          messages: []
+        }
+        setChatRooms((prev) => [newRoom, ...prev])
+        setSelectedChatRoom(newRoom)
+        setView("chat")
+      }
+    } else {
+      setShowPaymentDialog(true)
     }
 
     setChatRooms((prev) => {
@@ -1256,9 +1345,6 @@ export default function ConsultingPage() {
           onBack={handleBack}
           onContact={handleContactDoctor}
           hasPaidAccess={hasPaidForDoctor(selectedDoctor.id)}
-          onLoadMoreReviews={handleLoadMoreReviews}
-          canLoadMoreReviews={reviewPage < reviewTotalPages}
-          isLoadingReviews={isLoadingReviews}
         />
         <PaymentDialog 
           doctor={selectedDoctor}
@@ -1341,7 +1427,7 @@ export default function ConsultingPage() {
           {chatRooms.length > 0 ? "Find More Doctors" : "Available Doctors"}
         </h2>
         <div className="grid gap-4 md:grid-cols-2">
-          {doctorsList.map((doctor) => {
+          {doctors.map((doctor) => {
             const hasPaid = hasPaidForDoctor(doctor.id)
             return (
               <Card 

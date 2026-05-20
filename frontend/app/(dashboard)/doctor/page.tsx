@@ -69,9 +69,7 @@ import {
   File,
   FileImage,
   FileType,
-  Download,
-  CircleAlert,
-  CheckCircle2,
+  Download
 } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
@@ -194,6 +192,27 @@ const availabilityPayloadFromRecord = (record: AvailabilityRecord) => {
   }))
 }
 
+// Days of the week
+const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+// Time slots
+const timeSlots = [
+  "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+  "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
+  "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00"
+]
+
+// Initial availability
+const initialAvailability = {
+  Monday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }, { start: "14:00", end: "17:00" }] },
+  Tuesday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }, { start: "14:00", end: "17:00" }] },
+  Wednesday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }] },
+  Thursday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }, { start: "14:00", end: "17:00" }] },
+  Friday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }] },
+  Saturday: { enabled: false, slots: [] },
+  Sunday: { enabled: false, slots: [] },
+}
+
 export default function DoctorDashboardPage() {
   const { user } = useAuth()
   const userId = user?.id
@@ -222,32 +241,11 @@ export default function DoctorDashboardPage() {
     category: "Hormones",
     content: "",
   })
-  const [availability, setAvailability] = useState<AvailabilityRecord>(initialAvailability)
+  const [availability, setAvailability] = useState<Record<string, { enabled: boolean; slots: { start: string; end: string }[] }>>(initialAvailability)
   const [isSavingAvailability, setIsSavingAvailability] = useState(false)
-  const [isPublishing, setIsPublishing] = useState(false)
-  const [isEditArticleDialogOpen, setIsEditArticleDialogOpen] = useState(false)
-  const [editingArticleId, setEditingArticleId] = useState<string | number | null>(null)
-  const [isSavingArticleEdit, setIsSavingArticleEdit] = useState(false)
-  const [deletingArticleId, setDeletingArticleId] = useState<string | number | null>(null)
-  const [editArticleData, setEditArticleData] = useState({
-    title: "",
-    category: "Hormones",
-    content: "",
-  })
-  const [uploadedFiles, setUploadedFiles] = useState<
-    { name: string; size: number; type: string; url: string }[]
-  >([])
-  const [uploadedAudio, setUploadedAudio] = useState<{
-    name: string
-    size: number
-    type: string
-    url: string
-  } | null>(null)
+  const [uploadedFiles, setUploadedFiles] = useState<{ name: string; size: number; type: string }[]>([])
   const [isUploading, setIsUploading] = useState(false)
-  const [isUploadingAudio, setIsUploadingAudio] = useState(false)
-  const [pageMessage, setPageMessage] = useState<PageMessage | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const audioInputRef = useRef<HTMLInputElement>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const recordedChunksRef = useRef<Blob[]>([])
@@ -457,22 +455,49 @@ export default function DoctorDashboardPage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  const resolveDoctorRecordId = async () => {
-    if (doctorRecordId) return doctorRecordId
-    if (!userId) return ""
+  const handlePublish = () => {
+    alert("Article published successfully!")
+    setArticleData({ title: "", category: "Hormones", content: "" })
+    setHasRecording(false)
+    setRecordingTime(0)
+    setUploadedFiles([])
+  }
 
-    try {
-      const doctor = await getDoctorByUserId(userId)
-      if (doctor?._id) {
-        const id = String(doctor._id)
-        setDoctorRecordId(id)
-        return id
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+
+    setIsUploading(true)
+    
+    // Simulate upload delay
+    setTimeout(() => {
+      const newFiles = Array.from(files).map(file => ({
+        name: file.name,
+        size: file.size,
+        type: file.type
+      }))
+      setUploadedFiles(prev => [...prev, ...newFiles])
+      setIsUploading(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
       }
-    } catch {
-      // no-op, handled by caller
-    }
+    }, 1000)
+  }
 
-    return ""
+  const removeFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + " B"
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB"
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB"
+  }
+
+  const getFileIcon = (type: string) => {
+    if (type.startsWith("image/")) return FileImage
+    if (type.includes("pdf")) return FileType
+    return File
   }
 
   const handlePublish = async () => {
@@ -801,17 +826,13 @@ export default function DoctorDashboardPage() {
     }))
   }
 
-  const handleSaveAvailability = async () => {
+  const handleSaveAvailability = () => {
     setIsSavingAvailability(true)
-    try {
-      if (!doctorRecordId) throw new Error("Missing doctor id")
-      await updateDoctorAvailability(doctorRecordId, availabilityPayloadFromRecord(availability))
-      setPageMessage({ type: "success", text: "Availability saved successfully!" })
-    } catch {
-      setPageMessage({ type: "error", text: "Failed to save availability. Please try again." })
-    } finally {
+    // Simulate API call
+    setTimeout(() => {
       setIsSavingAvailability(false)
-    }
+      alert("Availability saved successfully!")
+    }, 1000)
   }
 
   const getTotalHours = () => {
@@ -1425,14 +1446,6 @@ export default function DoctorDashboardPage() {
                 onChange={handleFileUpload}
                 className="hidden"
               />
-
-              <input
-                ref={audioInputRef}
-                type="file"
-                accept="audio/*"
-                onChange={handleAudioUpload}
-                className="hidden"
-              />
               
               {/* Drop zone / Upload button */}
               <div 
@@ -1478,17 +1491,12 @@ export default function DoctorDashboardPage() {
                               <FileIcon className="h-5 w-5 text-muted-foreground" />
                             </div>
                             <div>
-                              <p className="text-sm font-medium truncate max-w-50">{file.name}</p>
+                              <p className="text-sm font-medium truncate max-w-[200px]">{file.name}</p>
                               <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => window.open(file.url, "_blank")}
-                            >
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
                               <Download className="h-4 w-4" />
                             </Button>
                             <Button 

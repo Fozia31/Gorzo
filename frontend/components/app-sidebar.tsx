@@ -2,7 +2,6 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { useEffect, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import {
   Home,
@@ -37,7 +36,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 const womanNavItems = [
   { title: "Home", icon: Home, href: "/dashboard" },
-  { title: "Ask EFOY", icon: Sparkles, href: "/dashboard/chatbot" },
   { title: "Discuss with Sisters", icon: Users, href: "/dashboard/forum" },
   { title: "My Posts", icon: FileText, href: "/dashboard/my-posts" },
   { title: "Knowledge Hub", icon: BookOpen, href: "/dashboard/knowledge" },
@@ -45,9 +43,8 @@ const womanNavItems = [
 ]
 
 const doctorNavItems = [
-  { title: "Doctor Dashboard", icon: FileText, href: "/doctor" },
-  { title: "Profile", icon: User, href: "/doctor/profile" },
-  { title: "Insights", icon: Mic, href: "/doctor/voice-notes" },
+  { title: "Info", icon: FileText, href: "/doctor" },
+  { title: "Voice Notes", icon: Mic, href: "/doctor/voice-notes" },
   { title: "Premium Chat Queue", icon: Inbox, href: "/doctor/chats" },
 ]
 

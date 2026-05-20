@@ -60,92 +60,33 @@ function ChatView({
   isSending: boolean
 }) {
   const [message, setMessage] = useState("")
-  const [sendError, setSendError] = useState("")
-  const [messages, setMessages] = useState<ChatMessage[]>([])
-  const messagesEndRef = useRef<HTMLDivElement | null>(null)
-  const socketRef = useRef<ReturnType<typeof getSocket> | null>(null)
+  
+  // Sample messages
+  const messages = [
+    {
+      id: 1,
+      sender: "user",
+      content: "Hello Dr. Amara, I've been experiencing irregular cycles for the past 3 months.",
+      time: "Yesterday, 10:30 AM"
+    },
+    {
+      id: 2,
+      sender: "doctor",
+      content: "Hello! Thank you for reaching out. Irregular cycles can have various causes. Can you tell me more about your symptoms? Are you experiencing any pain, unusual discharge, or other changes?",
+      time: "Yesterday, 11:45 AM"
+    },
+    {
+      id: 3,
+      sender: "user",
+      content: "No pain, but I've noticed some weight changes and mood swings.",
+      time: "Yesterday, 2:00 PM"
+    },
+  ]
 
-  useEffect(() => {
-    // Fetch message history
-    (async () => {
-      try {
-        const res = await chatApi.getMessages(chat.id)
-        setMessages(
-          (res.data || []).map((msg: { _id?: string | number; senderType?: string; messageText?: string; createdAt?: string }) => ({
-            id: msg._id,
-            sender: msg.senderType === 'doctor' ? 'doctor' : 'user',
-            content: msg.messageText ?? "",
-            time: msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString() : "Now",
-          }))
-        )
-      } catch {}
-    })()
-    const socket = getSocket()
-    socket.connect()
-    socket.emit('joinPremium', chat.id)
-    socket.on('premiumMessage', (data: { chatId?: string | number; _id?: string | number; senderType?: string; messageText?: string; createdAt?: string }) => {
-      // Only add if for this chat
-      if (data.chatId === chat.id) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: data._id || Date.now(),
-            sender: data.senderType === 'doctor' ? 'doctor' : 'user',
-            content: data.messageText ?? "",
-            time: data.createdAt ? new Date(data.createdAt).toLocaleTimeString() : "Now",
-          },
-        ])
-      }
-    })
-    socketRef.current = socket
-    return () => {
-      socket.off('premiumMessage')
-      socket.disconnect()
+  const handleSend = () => {
+    if (message.trim()) {
+      setMessage("")
     }
-  }, [chat.id])
-
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
-    }
-  }, [messages])
-
-  const handleSend = async () => {
-    setSendError("")
-    if (!message.trim()) return
-    const newMsg = {
-      chatId: chat.id,
-      senderId: 'doctor', // Replace with actual doctorId if available
-      messageText: message.trim(),
-      senderType: 'doctor',
-    }
-    // Send via WebSocket
-    socketRef.current?.emit('premiumMessage', newMsg)
-    // Save to DB via chatApi
-    try {
-      await chatApi.sendMessage(newMsg)
-    } catch (e) {
-      setSendError("Sorry, your message could not be sent. Please try again.")
-      return
-    }
-    // Gemini AI integration: send prompt and get response
-    try {
-      const aiRes = await chatApi.sendGeminiMessage({ userId: chat.id, prompt: message.trim() })
-      if (aiRes && aiRes.response) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now(),
-            sender: "user",
-            content: aiRes.response,
-            time: new Date().toLocaleTimeString(),
-          },
-        ])
-      }
-    } catch (e) {
-      setSendError("AI response failed. Please try again.")
-    }
-    setMessage("")
   }
 
   return (

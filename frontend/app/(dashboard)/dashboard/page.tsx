@@ -151,7 +151,7 @@ export default function DashboardPage() {
               <div className="mb-2 rounded-full bg-primary/10 p-3 transition-colors group-hover:bg-primary/20">
                 <Heart className="h-5 w-5 text-primary" />
               </div>
-              <span className="text-xs font-medium text-center">Discuss with Sisters</span>
+              <span className="text-sm font-medium text-center text-xs">Discuss with Sisters</span>
             </CardContent>
           </Card>
         </Link>

@@ -54,15 +54,36 @@ import {
   CheckCircle2,
 } from "lucide-react"
 
-type DoctorRow = {
-  id: string
-  name: string
-  email: string
-  specialty: string
-  status: string
-  articles: number
-  joinedAt: string
-}
+// Sample doctors
+const initialDoctors = [
+  {
+    id: 1,
+    name: "Dr. Amara Bekele",
+    email: "amara@efoy.com",
+    specialty: "Gynecologist",
+    status: "active",
+    articles: 12,
+    joinedAt: "Jan 2024",
+  },
+  {
+    id: 2,
+    name: "Dr. Selam Haile",
+    email: "selam@efoy.com",
+    specialty: "Nutritionist",
+    status: "active",
+    articles: 8,
+    joinedAt: "Feb 2024",
+  },
+  {
+    id: 3,
+    name: "Dr. Hana Tadesse",
+    email: "hana@efoy.com",
+    specialty: "Reproductive Health",
+    status: "active",
+    articles: 5,
+    joinedAt: "Mar 2024",
+  },
+]
 
 const specialties = [
   "Gynecologist",

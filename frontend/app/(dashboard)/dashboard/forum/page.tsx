@@ -73,7 +73,6 @@ export default function ForumPage() {
   const [commentsMap, setCommentsMap] = useState<Record<string, any[]>>({})
   const [commentText, setCommentText] = useState("")
   const [userEngagements, setUserEngagements] = useState<Record<string, { Like?: any; Repost?: any; Report?: any }>>({})
-  const [pageMessage, setPageMessage] = useState<PageMessage | null>(null)
 
   const handleLike = async (postId: string) => {
     if (!user) {
@@ -128,7 +127,7 @@ export default function ForumPage() {
 
   const handleRepost = async (postId: string) => {
     if (!user) {
-      setPageMessage({ type: "error", text: "You must be logged in to repost" })
+      alert("You must be logged in to repost")
       return
     }
 
@@ -171,18 +170,18 @@ export default function ForumPage() {
       }
     } catch (error) {
       console.error("Failed to toggle repost:", error)
-      setPageMessage({ type: "error", text: "Failed to update repost. Please try again." })
+      alert("Failed to update repost. Please try again.")
     }
   }
 
   const handleReport = async (postId: string) => {
     if (!user) {
-      setPageMessage({ type: "error", text: "Please log in to report this post." })
+      alert("Please log in to report this post.")
       return
     }
 
     if (userEngagements[postId]?.Report) {
-      setPageMessage({ type: "error", text: "You have already reported this post." })
+      alert("You have already reported this post.")
       return
     }
 
@@ -202,14 +201,14 @@ export default function ForumPage() {
         },
       }))
 
-      setPageMessage({ type: "success", text: "Post reported successfully." })
+      alert("Post reported successfully.")
     } catch (error: any) {
       console.error("Failed to report post:", error)
       if (error?.statusCode === 409) {
-        setPageMessage({ type: "error", text: "You have already reported this post." })
+        alert("You have already reported this post.")
         return
       }
-      setPageMessage({ type: "error", text: error?.message || "Unable to report this post. Please try again." })
+      alert(error?.message || "Unable to report this post. Please try again.")
     }
   }
 

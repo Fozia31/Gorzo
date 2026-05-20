@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,6 +20,7 @@ import {
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
+import { getPaymentStatus, initiatePayment } from "@/api/paymentApi"
 
 type PaymentStatus = "idle" | "processing" | "waiting" | "success" | "error"
 
@@ -59,38 +60,19 @@ const doctors = [
   },
 ]
 
-function PaymentPageContent() {
+function PaymentContent() {
   const searchParams = useSearchParams()
   const doctorId = searchParams.get("doctor")
-  const doctorRecordId = searchParams.get("doctorRecordId")
-  const doctorNameParam = searchParams.get("doctorName")
-  const specialtyParam = searchParams.get("specialty")
-  const ratingParam = searchParams.get("rating")
-  const avatarParam = searchParams.get("avatar")
   const amountParam = searchParams.get("amount")
-  const { updateTier } = useAuth()
+  const { user } = useAuth()
   
   const [phoneNumber, setPhoneNumber] = useState("")
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("idle")
   const [transactionId, setTransactionId] = useState("")
+  const [paymentError, setPaymentError] = useState("")
 
-  const parsedDoctorId = doctorId ? Number(doctorId) : Number.NaN
-  const doctorFromList = Number.isFinite(parsedDoctorId)
-    ? doctors.find((d) => d.id === parsedDoctorId)
-    : undefined
-
-  const doctor = doctorFromList || (doctorNameParam
-    ? {
-        id: Number.isFinite(parsedDoctorId) ? parsedDoctorId : 0,
-        doctorRecordId: doctorRecordId || "",
-        name: decodeURIComponent(doctorNameParam),
-        specialty: decodeURIComponent(specialtyParam || "General Practitioner"),
-        avatar: decodeURIComponent(avatarParam || "/logo.jpg"),
-        rating: Number(ratingParam || 0),
-        consultationFee: amountParam ? parseInt(amountParam) : 299,
-      }
-    : null)
-
+  // Find the doctor
+  const doctor = doctorId ? doctors.find(d => d.id === parseInt(doctorId)) : null
   const amount = amountParam ? parseInt(amountParam) : doctor?.consultationFee || 299
 
   const formatPhoneNumber = (value: string) => {
@@ -108,6 +90,7 @@ function PaymentPageContent() {
   }
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPaymentError("")
     setPhoneNumber(formatPhoneNumber(e.target.value))
   }
 
@@ -124,29 +107,65 @@ function PaymentPageContent() {
 
   const isValidPhone = () => {
     const formatted = getFormattedPhone()
-    return formatted.match(/^\+2517\d{8}$/)
+    return formatted.match(/^\+251[79]\d{8}$/)
   }
 
   const handlePayment = async () => {
     if (!isValidPhone()) return
+    if (!user?.id) {
+      setPaymentError("Please log in again to continue with payment.")
+      return
+    }
 
+    setPaymentError("")
     setPaymentStatus("processing")
-    
-    // Simulate M-Pesa API call
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    
-    setPaymentStatus("waiting")
-    
-    // Simulate waiting for user to confirm on phone
-    await new Promise(resolve => setTimeout(resolve, 5000))
-    
-    // Simulate successful payment
-    setTransactionId(`MP${Date.now().toString().slice(-10)}`)
-    setPaymentStatus("success")
-    
-    // Upgrade user to premium status
-    updateTier("premium")
+
+    try {
+      const response = await initiatePayment({
+        userId: user.id,
+        doctorId: doctorId,
+        phoneNumber: getFormattedPhone(),
+        amount,
+      })
+
+      const txId = response?.data?.transactionId
+      if (!txId) {
+        throw new Error("Payment transaction was not created.")
+      }
+
+      setTransactionId(txId)
+      setPaymentStatus("waiting")
+    } catch (error: any) {
+      const backendMessage = error?.response?.data?.message
+      setPaymentError(backendMessage || "Failed to initiate payment. Please try again.")
+      setPaymentStatus("error")
+    }
   }
+
+  useEffect(() => {
+    if (paymentStatus !== "waiting" || !transactionId) return
+
+    const interval = setInterval(async () => {
+      try {
+        const response = await getPaymentStatus(transactionId)
+        const status = response?.data?.status
+        if (status === "success") {
+          setPaymentStatus("success")
+          return
+        }
+        if (["failed", "cancelled", "timeout"].includes(status)) {
+          setPaymentStatus("error")
+          setPaymentError(response?.data?.resultDescription || "Payment did not complete.")
+        }
+      } catch (error: any) {
+        const backendMessage = error?.response?.data?.message
+        setPaymentStatus("error")
+        setPaymentError(backendMessage || "Unable to confirm payment status.")
+      }
+    }, 3000)
+
+    return () => clearInterval(interval)
+  }, [paymentStatus, transactionId])
 
   // Redirect if no doctor specified
   if (!doctor) {
@@ -200,10 +219,7 @@ function PaymentPageContent() {
             </div>
 
             <div className="flex w-full flex-col gap-2">
-              <Link
-                href={`/dashboard/consulting?payment=success&doctor=${encodeURIComponent(String(doctorId || doctor.id))}${doctorRecordId ? `&doctorRecordId=${encodeURIComponent(doctorRecordId)}` : ""}`}
-                className="w-full"
-              >
+              <Link href={`/dashboard/consulting?payment=success&doctor=${doctorId}`} className="w-full">
                 <Button className="w-full gap-2">
                   <MessageCircle className="h-4 w-4" />
                   Start Chatting with {doctor.name.split(' ')[0]}
@@ -263,7 +279,7 @@ function PaymentPageContent() {
 
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Clock className="h-4 w-4" />
-              <span>Request expires in 60 seconds</span>
+              <span>Waiting for M-Pesa confirmation...</span>
             </div>
           </CardContent>
         </Card>
@@ -282,7 +298,7 @@ function PaymentPageContent() {
         </Link>
         <div>
           <h1 className="font-serif text-2xl font-semibold text-foreground md:text-3xl">
-            Mock M-Pesa (Demo)
+            Pay for Consultation
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Frontend-only demo payment flow
@@ -412,7 +428,7 @@ function PaymentPageContent() {
               <Button 
                 className="w-full gap-2" 
                 size="lg"
-                disabled={!isValidPhone() || paymentStatus === "processing"}
+                disabled={!isValidPhone() || paymentStatus === "processing" || paymentStatus === "waiting"}
                 onClick={handlePayment}
               >
                 {paymentStatus === "processing" ? (
@@ -420,12 +436,20 @@ function PaymentPageContent() {
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Processing...
                   </>
+                ) : paymentStatus === "waiting" ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Waiting for confirmation...
+                  </>
                 ) : (
                   <>
                     Pay {amount} ETB
                   </>
                 )}
               </Button>
+              {paymentError && (
+                <p className="text-sm text-destructive">{paymentError}</p>
+              )}
 
               <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
                 <Shield className="h-4 w-4" />
@@ -450,8 +474,12 @@ function PaymentPageContent() {
 
 export default function PaymentPage() {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading payment options...</div>}>
-      <PaymentPageContent />
+    <Suspense fallback={
+      <div className="flex min-h-[80vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    }>
+      <PaymentContent />
     </Suspense>
   )
 }
