@@ -1,77 +1,88 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
-import Image from "next/image"
-import { useRouter } from "next/navigation"
-import { Eye, EyeOff, User, Lock, ShieldCheck } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { useAuth } from "@/lib/auth-context"
-import { loginUser } from "@/api/userApi"
+import { useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { Eye, EyeOff, User, Lock, ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useAuth } from "@/lib/auth-context";
+import { loginUser } from "@/api/userApi";
 
 export default function DoctorLoginPage() {
-  const router = useRouter()
-  const [showPassword, setShowPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState("")
+  const router = useRouter();
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
   const [formData, setFormData] = useState({
     username: "",
     password: "",
-  })
+  });
 
-  const { login } = useAuth()
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError("")
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
 
     try {
-      const res = await loginUser({ email: formData.username, password: formData.password })
-      const backendUser = res.data
-      
+      const res = await loginUser({
+        email: formData.username,
+        password: formData.password,
+      });
+      const backendUser = res.data;
+
       // Check if user is a doctor
-      if (backendUser.role !== 'Doctor') {
-        setError("Access denied. This portal is for doctors only.")
-        setIsLoading(false)
-        return
+      if (backendUser.role !== "Doctor") {
+        setError("Access denied. This portal is for doctors only.");
+        setIsLoading(false);
+        return;
       }
-      
+
       // Convert to frontend user shape
-      const tier: "premium" | "free" = backendUser.isPremium ? "premium" : "free"
+      const tier: "premium" | "free" = backendUser.isPremium
+        ? "premium"
+        : "free";
       const frontendUser = {
         id: backendUser._id,
         username: backendUser.displayName,
         email: backendUser.email,
-        role: 'doctor' as const,
+        role: "doctor" as const,
         tier,
         avatar: backendUser.avatar || "",
-      }
-      
-      login(frontendUser)
-      router.push("/doctor")
+      };
+
+      login(frontendUser);
+      router.push("/doctor");
     } catch (err: any) {
-      console.error('doctor login error', err)
-      setError(err?.message || 'Invalid credentials')
+      console.error("doctor login error", err);
+      setError(err?.message || "Invalid credentials");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <div className="w-full max-w-md space-y-8">
       <div className="text-center">
         <div className="mx-auto flex flex-col items-center">
           <div className="h-20 w-20 overflow-hidden rounded-full border-2 border-primary/20">
-            <Image 
-              src="/logo.jpg" 
-              alt="EFOY" 
-              width={80} 
-              height={80} 
+            <Image
+              src="/logo.jpg"
+              alt="EFOY"
+              width={80}
+              height={80}
               className="h-full w-full object-cover"
             />
           </div>
@@ -98,7 +109,7 @@ export default function DoctorLoginPage() {
                 {error}
               </div>
             )}
-            
+
             <div className="space-y-2">
               <Label htmlFor="username">Email</Label>
               <div className="relative">
@@ -109,7 +120,9 @@ export default function DoctorLoginPage() {
                   placeholder="Enter your email"
                   className="pl-10"
                   value={formData.username}
-                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, username: e.target.value })
+                  }
                   required
                 />
               </div>
@@ -124,7 +137,9 @@ export default function DoctorLoginPage() {
                   placeholder="Enter your password"
                   className="pl-10 pr-10"
                   value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, password: e.target.value })
+                  }
                   required
                 />
                 <Button
@@ -149,8 +164,8 @@ export default function DoctorLoginPage() {
                 <div className="text-xs text-muted-foreground">
                   <p className="font-medium text-foreground">Secure Access</p>
                   <p className="mt-1">
-                    Your credentials are provided by the EFOY admin team. 
-                    If you need account assistance, please contact your administrator.
+                    Your credentials are provided by the EFOY admin team. If you
+                    need account assistance, please contact your administrator.
                   </p>
                 </div>
               </div>
@@ -186,5 +201,5 @@ export default function DoctorLoginPage() {
         Protected healthcare provider portal. Unauthorized access is prohibited.
       </p>
     </div>
-  )
+  );
 }

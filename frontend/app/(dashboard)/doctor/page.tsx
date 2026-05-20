@@ -1,15 +1,21 @@
-"use client"
+"use client";
 
-import { useState, useRef, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { useState, useRef, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
@@ -18,8 +24,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { useAuth } from "@/lib/auth-context"
+} from "@/components/ui/dialog";
+import { useAuth } from "@/lib/auth-context";
 import {
   getDoctorAvailability,
   getDoctorByUserId,
@@ -28,7 +34,7 @@ import {
   getDoctorRatingStats,
   getDoctorRatings,
   updateDoctorAvailability,
-} from "@/api/doctorApi"
+} from "@/api/doctorApi";
 import {
   createDoctorAdvice,
   deleteDoctorAdvice,
@@ -37,10 +43,10 @@ import {
   updateDoctorAdvice,
   uploadDoctorAdviceAudio,
   uploadDoctorAdviceFiles,
-} from "@/api/doctorAdviceApi"
-import { getOrCreateDoctorChat } from "@/api/chatApi"
-import { sendMessage } from "@/api/messageApi"
-import { 
+} from "@/api/doctorAdviceApi";
+import { getOrCreateDoctorChat } from "@/api/chatApi";
+import { sendMessage } from "@/api/messageApi";
+import {
   FileText,
   Mic,
   MicOff,
@@ -69,42 +75,51 @@ import {
   File,
   FileImage,
   FileType,
-  Download
-} from "lucide-react"
-import { Switch } from "@/components/ui/switch"
-import { cn } from "@/lib/utils"
+  Download,
+  CircleAlert,
+  CheckCircle2,
+} from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 
 type DashboardPatient = {
-  id: string
-  username: string
-  avatar: string
-  lastVisit: string
-  status: "active" | "inactive"
-  tier: "premium" | "free"
-  unreadMessages: number
-  consultations: number
-  joinedDate: string
-}
+  id: string;
+  username: string;
+  avatar: string;
+  lastVisit: string;
+  status: "active" | "inactive";
+  tier: "premium" | "free";
+  unreadMessages: number;
+  consultations: number;
+  joinedDate: string;
+};
 
 type PublishedArticle = {
-  id: string | number
-  title: string
-  category: string
-  publishedAt: string
-  views: number
-  hasVoiceNote: boolean
-}
+  id: string | number;
+  title: string;
+  category: string;
+  publishedAt: string;
+  views: number;
+  hasVoiceNote: boolean;
+};
 
 type RatingReview = {
-  id: string | number
-  user: string
-  rating: number
-  comment: string
-  date: string
-  anonymous: boolean
-}
+  id: string | number;
+  user: string;
+  rating: number;
+  comment: string;
+  date: string;
+  anonymous: boolean;
+};
 
-const categories = ["Hormones", "Nutrition", "Fertility", "Conditions", "Wellness", "Mental Health"]
+const categories = [
+  "Hormones",
+  "Nutrition",
+  "Fertility",
+  "Conditions",
+  "Wellness",
+  "Mental Health",
+];
 
 const emptyRatingStats = {
   average: 0,
@@ -118,168 +133,249 @@ const emptyRatingStats = {
   ],
   thisMonth: 0,
   lastMonth: 0,
-}
+};
 
 type PageMessage = {
-  type: "success" | "error"
-  text: string
-}
+  type: "success" | "error";
+  text: string;
+};
+
+type UploadedFile = {
+  name: string;
+  size: number;
+  type: string;
+  url: string;
+};
+
+type UploadedAudio = {
+  name: string;
+  size: number;
+  type: string;
+  url: string;
+};
 
 // Days of the week
-const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+const daysOfWeek = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
 
 // Time slots
 const timeSlots = [
-  "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
-  "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
-  "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00"
-]
+  "08:00",
+  "08:30",
+  "09:00",
+  "09:30",
+  "10:00",
+  "10:30",
+  "11:00",
+  "11:30",
+  "12:00",
+  "12:30",
+  "13:00",
+  "13:30",
+  "14:00",
+  "14:30",
+  "15:00",
+  "15:30",
+  "16:00",
+  "16:30",
+  "17:00",
+  "17:30",
+  "18:00",
+  "18:30",
+  "19:00",
+  "19:30",
+  "20:00",
+];
 
-type AvailabilitySlot = { start: string; end: string }
-type AvailabilityDay = { enabled: boolean; slots: AvailabilitySlot[] }
-type AvailabilityRecord = Record<string, AvailabilityDay>
+type AvailabilitySlot = { start: string; end: string };
+type AvailabilityDay = { enabled: boolean; slots: AvailabilitySlot[] };
+type AvailabilityRecord = Record<string, AvailabilityDay>;
 
 const initialAvailability: AvailabilityRecord = {
-  Monday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }, { start: "14:00", end: "17:00" }] },
-  Tuesday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }, { start: "14:00", end: "17:00" }] },
+  Monday: {
+    enabled: true,
+    slots: [
+      { start: "09:00", end: "12:00" },
+      { start: "14:00", end: "17:00" },
+    ],
+  },
+  Tuesday: {
+    enabled: true,
+    slots: [
+      { start: "09:00", end: "12:00" },
+      { start: "14:00", end: "17:00" },
+    ],
+  },
   Wednesday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }] },
-  Thursday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }, { start: "14:00", end: "17:00" }] },
+  Thursday: {
+    enabled: true,
+    slots: [
+      { start: "09:00", end: "12:00" },
+      { start: "14:00", end: "17:00" },
+    ],
+  },
   Friday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }] },
   Saturday: { enabled: false, slots: [] },
   Sunday: { enabled: false, slots: [] },
-}
+};
 
 const buildAvatar = (username: string) => {
-  const parts = username.trim().split(" ").filter(Boolean)
-  if (parts.length === 0) return "U"
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
-}
+  const parts = username.trim().split(" ").filter(Boolean);
+  if (parts.length === 0) return "U";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+};
 
 const toRelativeTime = (dateValue: string | number | Date | undefined) => {
-  if (!dateValue) return "N/A"
-  const date = new Date(dateValue)
-  const diffMs = Date.now() - date.getTime()
-  const minutes = Math.floor(diffMs / (1000 * 60))
-  if (minutes < 1) return "just now"
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
+  if (!dateValue) return "N/A";
+  const date = new Date(dateValue);
+  const diffMs = Date.now() - date.getTime();
+  const minutes = Math.floor(diffMs / (1000 * 60));
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+};
 
 const availabilityRecordFromApi = (
-  apiAvailability: Array<{ day: string; enabled: boolean; slots: AvailabilitySlot[] }>
+  apiAvailability: Array<{
+    day: string;
+    enabled: boolean;
+    slots: AvailabilitySlot[];
+  }>,
 ) => {
-  const base: AvailabilityRecord = { ...initialAvailability }
+  const base: AvailabilityRecord = { ...initialAvailability };
   for (const item of apiAvailability || []) {
     if (base[item.day as keyof typeof base]) {
       base[item.day as keyof typeof base] = {
         enabled: Boolean(item.enabled),
         slots: Array.isArray(item.slots) ? item.slots : [],
-      }
+      };
     }
   }
-  return base
-}
+  return base;
+};
 
 const availabilityPayloadFromRecord = (record: AvailabilityRecord) => {
   return daysOfWeek.map((day) => ({
     day,
     enabled: Boolean(record[day]?.enabled),
     slots: Array.isArray(record[day]?.slots) ? record[day].slots : [],
-  }))
-}
-
-// Days of the week
-const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-
-// Time slots
-const timeSlots = [
-  "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
-  "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
-  "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00"
-]
-
-// Initial availability
-const initialAvailability = {
-  Monday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }, { start: "14:00", end: "17:00" }] },
-  Tuesday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }, { start: "14:00", end: "17:00" }] },
-  Wednesday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }] },
-  Thursday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }, { start: "14:00", end: "17:00" }] },
-  Friday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }] },
-  Saturday: { enabled: false, slots: [] },
-  Sunday: { enabled: false, slots: [] },
-}
+  }));
+};
 
 export default function DoctorDashboardPage() {
-  const { user } = useAuth()
-  const userId = user?.id
-  const [doctorRecordId, setDoctorRecordId] = useState<string>("")
-  const [patients, setPatients] = useState<DashboardPatient[]>([])
-  const [publishedArticles, setPublishedArticles] = useState<PublishedArticle[]>([])
-  const [myRatings, setMyRatings] = useState<RatingReview[]>([])
-  const [ratingStats, setRatingStats] = useState(emptyRatingStats)
+  const { user } = useAuth();
+  const userId = user?.id;
+  const [doctorRecordId, setDoctorRecordId] = useState<string>("");
+  const [patients, setPatients] = useState<DashboardPatient[]>([]);
+  const [publishedArticles, setPublishedArticles] = useState<
+    PublishedArticle[]
+  >([]);
+  const [myRatings, setMyRatings] = useState<RatingReview[]>([]);
+  const [ratingStats, setRatingStats] = useState(emptyRatingStats);
   const [dashboardSummary, setDashboardSummary] = useState({
     patients: 0,
     unreadMessages: 0,
     publishedArticles: 0,
     ratingAverage: 0,
     ratingTotal: 0,
-  })
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedPatient, setSelectedPatient] = useState<DashboardPatient | null>(null)
-  const [isRecording, setIsRecording] = useState(false)
-  const [recordingTime, setRecordingTime] = useState(0)
-  const [hasRecording, setHasRecording] = useState(false)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [messageToSend, setMessageToSend] = useState("")
-  const [sendingVoiceNote, setSendingVoiceNote] = useState(false)
+  });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedPatient, setSelectedPatient] =
+    useState<DashboardPatient | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [hasRecording, setHasRecording] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [messageToSend, setMessageToSend] = useState("");
+  const [sendingVoiceNote, setSendingVoiceNote] = useState(false);
   const [articleData, setArticleData] = useState({
     title: "",
     category: "Hormones",
     content: "",
-  })
-  const [availability, setAvailability] = useState<Record<string, { enabled: boolean; slots: { start: string; end: string }[] }>>(initialAvailability)
-  const [isSavingAvailability, setIsSavingAvailability] = useState(false)
-  const [uploadedFiles, setUploadedFiles] = useState<{ name: string; size: number; type: string }[]>([])
-  const [isUploading, setIsUploading] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const timerRef = useRef<NodeJS.Timeout | null>(null)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const recordedChunksRef = useRef<Blob[]>([])
-  const recordingStreamRef = useRef<MediaStream | null>(null)
+  });
+  const [availability, setAvailability] =
+    useState<
+      Record<
+        string,
+        { enabled: boolean; slots: { start: string; end: string }[] }
+      >
+    >(initialAvailability);
+  const [isSavingAvailability, setIsSavingAvailability] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [uploadedAudio, setUploadedAudio] = useState<UploadedAudio | null>(
+    null,
+  );
+  const [pageMessage, setPageMessage] = useState<PageMessage | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isUploadingAudio, setIsUploadingAudio] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [editingArticleId, setEditingArticleId] = useState<
+    string | number | null
+  >(null);
+  const [editArticleData, setEditArticleData] = useState({
+    title: "",
+    category: "Hormones",
+    content: "",
+  });
+  const [isEditArticleDialogOpen, setIsEditArticleDialogOpen] = useState(false);
+  const [isSavingArticleEdit, setIsSavingArticleEdit] = useState(false);
+  const [deletingArticleId, setDeletingArticleId] = useState<
+    string | number | null
+  >(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     const loadDoctorRecordId = async () => {
-      if (!userId) return
+      if (!userId) return;
       try {
-        const doctor = await getDoctorByUserId(userId)
+        const doctor = await getDoctorByUserId(userId);
         if (doctor?._id) {
-          setDoctorRecordId(String(doctor._id))
+          setDoctorRecordId(String(doctor._id));
         }
       } catch {
-        setDoctorRecordId("")
+        setDoctorRecordId("");
       }
-    }
+    };
 
-    void loadDoctorRecordId()
-  }, [userId, user?.email, user?.username])
+    void loadDoctorRecordId();
+  }, [userId, user?.email, user?.username]);
 
   useEffect(() => {
     const loadDashboard = async () => {
-      if (!doctorRecordId) return
+      if (!doctorRecordId) return;
 
       try {
-        const [summary, patientsResponse, apiAvailability, stats, ratingsResponse, adviceItems] = await Promise.all([
+        const [
+          summary,
+          patientsResponse,
+          apiAvailability,
+          stats,
+          ratingsResponse,
+          adviceItems,
+        ] = await Promise.all([
           getDoctorDashboardSummary(doctorRecordId),
           getDoctorPatients(doctorRecordId, { limit: 100 }),
           getDoctorAvailability(doctorRecordId),
           getDoctorRatingStats(doctorRecordId),
           getDoctorRatings(doctorRecordId, { limit: 20 }),
           getDoctorAdviceByDoctor(doctorRecordId, { status: "published" }),
-        ])
+        ]);
 
         setDashboardSummary({
           patients: Number(summary?.patients || 0),
@@ -287,7 +383,7 @@ export default function DoctorDashboardPage() {
           publishedArticles: Number(summary?.publishedArticles || 0),
           ratingAverage: Number(summary?.rating?.average || 0),
           ratingTotal: Number(summary?.rating?.total || 0),
-        })
+        });
 
         const mappedPatients = Array.isArray(patientsResponse?.data)
           ? patientsResponse.data.map((item: any) => ({
@@ -301,14 +397,14 @@ export default function DoctorDashboardPage() {
               consultations: Number(item.consultations || 0),
               joinedDate: item.joinedDate || "",
             }))
-          : []
+          : [];
 
         if (mappedPatients.length > 0) {
-          setPatients(mappedPatients)
+          setPatients(mappedPatients);
         }
 
         if (Array.isArray(apiAvailability) && apiAvailability.length > 0) {
-          setAvailability(availabilityRecordFromApi(apiAvailability))
+          setAvailability(availabilityRecordFromApi(apiAvailability));
         }
 
         setRatingStats({
@@ -319,7 +415,7 @@ export default function DoctorDashboardPage() {
             : emptyRatingStats.distribution,
           thisMonth: Number(stats?.thisMonth || 0),
           lastMonth: Number(stats?.lastMonth || 0),
-        })
+        });
 
         const mappedRatings = Array.isArray(ratingsResponse?.data)
           ? ratingsResponse.data.map((item: any) => ({
@@ -330,8 +426,8 @@ export default function DoctorDashboardPage() {
               date: toRelativeTime(item.date),
               anonymous: Boolean(item.anonymous),
             }))
-          : []
-        setMyRatings(mappedRatings)
+          : [];
+        setMyRatings(mappedRatings);
 
         if (Array.isArray(adviceItems)) {
           setPublishedArticles(
@@ -342,191 +438,192 @@ export default function DoctorDashboardPage() {
               publishedAt: toRelativeTime(item.createdAt),
               views: Number(item.viewsCount || 0),
               hasVoiceNote: Boolean(item.voiceUrl),
-            }))
-          )
+            })),
+          );
         }
       } catch {
         // Keep already loaded values on API errors.
       }
-    }
+    };
 
-    void loadDashboard()
-  }, [doctorRecordId])
+    void loadDashboard();
+  }, [doctorRecordId]);
 
   useEffect(() => {
     return () => {
       if (timerRef.current) {
-        clearInterval(timerRef.current)
+        clearInterval(timerRef.current);
       }
       if (recordingStreamRef.current) {
-        recordingStreamRef.current.getTracks().forEach((track) => track.stop())
+        recordingStreamRef.current.getTracks().forEach((track) => track.stop());
       }
-    }
-  }, [])
+    };
+  }, []);
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      recordingStreamRef.current = stream
-      recordedChunksRef.current = []
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordingStreamRef.current = stream;
+      recordedChunksRef.current = [];
 
-      const recorder = new MediaRecorder(stream)
-      mediaRecorderRef.current = recorder
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
-          recordedChunksRef.current.push(event.data)
+          recordedChunksRef.current.push(event.data);
         }
-      }
+      };
 
-      recorder.start()
-      setUploadedAudio(null)
-      setHasRecording(false)
-      setIsRecording(true)
-      setRecordingTime(0)
+      recorder.start();
+      setUploadedAudio(null);
+      setHasRecording(false);
+      setIsRecording(true);
+      setRecordingTime(0);
       timerRef.current = setInterval(() => {
-        setRecordingTime((prev) => prev + 1)
-      }, 1000)
+        setRecordingTime((prev) => prev + 1);
+      }, 1000);
     } catch {
-      setPageMessage({ type: "error", text: "Microphone access denied or unavailable." })
+      setPageMessage({
+        type: "error",
+        text: "Microphone access denied or unavailable.",
+      });
     }
-  }
+  };
 
   const stopRecording = () => {
-    const recorder = mediaRecorderRef.current
-    if (!recorder) return
+    const recorder = mediaRecorderRef.current;
+    if (!recorder) return;
 
-    setIsRecording(false)
+    setIsRecording(false);
     if (timerRef.current) {
-      clearInterval(timerRef.current)
-      timerRef.current = null
+      clearInterval(timerRef.current);
+      timerRef.current = null;
     }
 
     recorder.onstop = async () => {
       try {
-        const audioBlob = new Blob(recordedChunksRef.current, { type: recorder.mimeType || "audio/webm" })
-        if (!audioBlob.size) throw new Error("Empty audio")
-
-        setIsUploadingAudio(true)
-        const extension = recorder.mimeType.includes("webm") ? "webm" : "wav"
-        const audioFile = new window.File([audioBlob], `recording-${Date.now()}.${extension}`, {
+        const audioBlob = new Blob(recordedChunksRef.current, {
           type: recorder.mimeType || "audio/webm",
-        })
+        });
+        if (!audioBlob.size) throw new Error("Empty audio");
 
-        const audioMeta = await uploadDoctorAdviceAudio(audioFile)
+        setIsUploadingAudio(true);
+        const extension = recorder.mimeType.includes("webm") ? "webm" : "wav";
+        const audioFile = new window.File(
+          [audioBlob],
+          `recording-${Date.now()}.${extension}`,
+          {
+            type: recorder.mimeType || "audio/webm",
+          },
+        );
+
+        const audioMeta = await uploadDoctorAdviceAudio(audioFile);
         setUploadedAudio({
           name: audioMeta?.name || audioFile.name,
           size: Number(audioMeta?.size || audioFile.size || 0),
           type: audioMeta?.mimeType || audioFile.type || "audio/webm",
           url: audioMeta?.url || "",
-        })
-        setHasRecording(true)
+        });
+        setHasRecording(true);
       } catch {
-        setPageMessage({ type: "error", text: "Failed to save recorded audio. Please try again." })
-        setHasRecording(false)
+        setPageMessage({
+          type: "error",
+          text: "Failed to save recorded audio. Please try again.",
+        });
+        setHasRecording(false);
       } finally {
-        setIsUploadingAudio(false)
-        recordedChunksRef.current = []
-        mediaRecorderRef.current = null
+        setIsUploadingAudio(false);
+        recordedChunksRef.current = [];
+        mediaRecorderRef.current = null;
         if (recordingStreamRef.current) {
-          recordingStreamRef.current.getTracks().forEach((track) => track.stop())
-          recordingStreamRef.current = null
+          recordingStreamRef.current
+            .getTracks()
+            .forEach((track) => track.stop());
+          recordingStreamRef.current = null;
         }
       }
-    }
+    };
 
-    recorder.stop()
-  }
+    recorder.stop();
+  };
 
   const deleteRecording = () => {
-    setHasRecording(false)
-    setRecordingTime(0)
-    setUploadedAudio(null)
-    recordedChunksRef.current = []
+    setHasRecording(false);
+    setRecordingTime(0);
+    setUploadedAudio(null);
+    recordedChunksRef.current = [];
     if (recordingStreamRef.current) {
-      recordingStreamRef.current.getTracks().forEach((track) => track.stop())
-      recordingStreamRef.current = null
+      recordingStreamRef.current.getTracks().forEach((track) => track.stop());
+      recordingStreamRef.current = null;
     }
-  }
+  };
 
   const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, '0')}`
-  }
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
 
-  const handlePublish = () => {
-    alert("Article published successfully!")
-    setArticleData({ title: "", category: "Hormones", content: "" })
-    setHasRecording(false)
-    setRecordingTime(0)
-    setUploadedFiles([])
-  }
+  const resolveDoctorRecordId = async () => {
+    if (doctorRecordId) return doctorRecordId;
+    if (!userId) return "";
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (!files) return
-
-    setIsUploading(true)
-    
-    // Simulate upload delay
-    setTimeout(() => {
-      const newFiles = Array.from(files).map(file => ({
-        name: file.name,
-        size: file.size,
-        type: file.type
-      }))
-      setUploadedFiles(prev => [...prev, ...newFiles])
-      setIsUploading(false)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ""
+    try {
+      const doctor = await getDoctorByUserId(userId);
+      if (doctor?._id) {
+        const resolvedId = String(doctor._id);
+        setDoctorRecordId(resolvedId);
+        return resolvedId;
       }
-    }, 1000)
-  }
-
-  const removeFile = (index: number) => {
-    setUploadedFiles(prev => prev.filter((_, i) => i !== index))
-  }
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return bytes + " B"
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB"
-    return (bytes / (1024 * 1024)).toFixed(1) + " MB"
-  }
-
-  const getFileIcon = (type: string) => {
-    if (type.startsWith("image/")) return FileImage
-    if (type.includes("pdf")) return FileType
-    return File
-  }
-
-  const handlePublish = async () => {
-    const resolvedDoctorId = await resolveDoctorRecordId()
-    if (!resolvedDoctorId) {
-      setPageMessage({ type: "error", text: "Doctor profile not found. Please sign in with a doctor account linked by admin." })
-      return
+    } catch {
+      // ignore
     }
 
-    const trimmedTitle = articleData.title.trim()
-    const trimmedContent = articleData.content.trim()
-    const hasAudio = Boolean(uploadedAudio?.url)
-    const hasFiles = uploadedFiles.length > 0
-    const hasText = Boolean(trimmedContent)
+    return "";
+  };
+
+  const handlePublish = async () => {
+    const resolvedDoctorId = await resolveDoctorRecordId();
+    if (!resolvedDoctorId) {
+      setPageMessage({
+        type: "error",
+        text: "Doctor profile not found. Please sign in with a doctor account linked by admin.",
+      });
+      return;
+    }
+
+    const trimmedTitle = articleData.title.trim();
+    const trimmedContent = articleData.content.trim();
+    const hasAudio = Boolean(uploadedAudio?.url);
+    const hasFiles = uploadedFiles.length > 0;
+    const hasText = Boolean(trimmedContent);
 
     if (!trimmedTitle) {
-      setPageMessage({ type: "error", text: "Please add an article title before publishing." })
-      return
+      setPageMessage({
+        type: "error",
+        text: "Please add an article title before publishing.",
+      });
+      return;
     }
 
     if (!hasText && !hasAudio && !hasFiles) {
-      setPageMessage({ type: "error", text: "Add article content, audio, or file attachment before publishing." })
-      return
+      setPageMessage({
+        type: "error",
+        text: "Add article content, audio, or file attachment before publishing.",
+      });
+      return;
     }
 
-    const contentType = hasAudio && hasText ? "Mixed" : hasAudio ? "VoiceURL" : "Text"
-    const finalTextContent = hasText ? trimmedContent : hasFiles ? "See attached files." : ""
+    const contentType =
+      hasAudio && hasText ? "Mixed" : hasAudio ? "VoiceURL" : "Text";
+    const finalTextContent = hasText
+      ? trimmedContent
+      : hasFiles
+        ? "See attached files."
+        : "";
 
-    setIsPublishing(true)
+    setIsPublishing(true);
     try {
       const created = await createDoctorAdvice({
         doctorId: resolvedDoctorId,
@@ -543,7 +640,7 @@ export default function DoctorDashboardPage() {
           size: file.size,
         })),
         status: "published",
-      })
+      });
 
       setPublishedArticles((prev) => [
         {
@@ -552,121 +649,139 @@ export default function DoctorDashboardPage() {
           category: created?.category || articleData.category,
           publishedAt: "just now",
           views: Number(created?.viewsCount || 0),
-          hasVoiceNote: Boolean(created?.voiceUrl) || Boolean(uploadedAudio?.url),
+          hasVoiceNote:
+            Boolean(created?.voiceUrl) || Boolean(uploadedAudio?.url),
         },
         ...prev,
-      ])
-      setDashboardSummary((prev) => ({ ...prev, publishedArticles: prev.publishedArticles + 1 }))
-      setArticleData({ title: "", category: "Hormones", content: "" })
-      setHasRecording(false)
-      setRecordingTime(0)
-      setUploadedFiles([])
-      setUploadedAudio(null)
-      setPageMessage({ type: "success", text: "Article published successfully!" })
+      ]);
+      setDashboardSummary((prev) => ({
+        ...prev,
+        publishedArticles: prev.publishedArticles + 1,
+      }));
+      setArticleData({ title: "", category: "Hormones", content: "" });
+      setHasRecording(false);
+      setRecordingTime(0);
+      setUploadedFiles([]);
+      setUploadedAudio(null);
+      setPageMessage({
+        type: "success",
+        text: "Article published successfully!",
+      });
     } catch (error: any) {
       const apiMessage =
         error?.message ||
         error?.error ||
         error?.response?.data?.message ||
-        "Failed to publish article. Please try again."
-      setPageMessage({ type: "error", text: apiMessage })
+        "Failed to publish article. Please try again.";
+      setPageMessage({ type: "error", text: apiMessage });
     } finally {
-      setIsPublishing(false)
+      setIsPublishing(false);
     }
-  }
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (!files) return
+    const files = e.target.files;
+    if (!files) return;
 
-    setIsUploading(true)
+    setIsUploading(true);
     try {
-      const selectedFiles = Array.from(files)
-      const uploaded = await uploadDoctorAdviceFiles(selectedFiles)
-      const newFiles: { name: string; size: number; type: string; url: string }[] = Array.isArray(uploaded)
+      const selectedFiles = Array.from(files);
+      const uploaded = await uploadDoctorAdviceFiles(selectedFiles);
+      const newFiles: {
+        name: string;
+        size: number;
+        type: string;
+        url: string;
+      }[] = Array.isArray(uploaded)
         ? uploaded.map((file: any) => ({
             name: file.name,
             size: Number(file.size || 0),
             type: file.mimeType || "application/octet-stream",
             url: String(file.url || ""),
           }))
-        : []
-      setUploadedFiles((prev) => [...prev, ...newFiles])
+        : [];
+      setUploadedFiles((prev) => [...prev, ...newFiles]);
     } catch {
-      setPageMessage({ type: "error", text: "Failed to upload files. Please try again." })
+      setPageMessage({
+        type: "error",
+        text: "Failed to upload files. Please try again.",
+      });
     } finally {
-      setIsUploading(false)
+      setIsUploading(false);
       if (fileInputRef.current) {
-        fileInputRef.current.value = ""
+        fileInputRef.current.value = "";
       }
     }
-  }
+  };
 
   const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (!files || files.length === 0) return
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    setIsUploadingAudio(true)
+    setIsUploadingAudio(true);
     try {
-      const audioMeta = await uploadDoctorAdviceAudio(files[0])
+      const audioMeta = await uploadDoctorAdviceAudio(files[0]);
       setUploadedAudio({
         name: audioMeta?.name || files[0].name,
         size: Number(audioMeta?.size || files[0].size || 0),
         type: audioMeta?.mimeType || files[0].type || "audio/mpeg",
         url: audioMeta?.url || "",
-      })
-      setHasRecording(true)
-      setRecordingTime(0)
+      });
+      setHasRecording(true);
+      setRecordingTime(0);
     } catch {
-      setPageMessage({ type: "error", text: "Failed to upload audio. Please try again." })
+      setPageMessage({
+        type: "error",
+        text: "Failed to upload audio. Please try again.",
+      });
     } finally {
-      setIsUploadingAudio(false)
+      setIsUploadingAudio(false);
       if (audioInputRef.current) {
-        audioInputRef.current.value = ""
+        audioInputRef.current.value = "";
       }
     }
-  }
+  };
 
   const handleOpenEditArticle = async (article: any) => {
-    setEditingArticleId(article.id)
+    setEditingArticleId(article.id);
     setEditArticleData({
       title: article.title || "",
       category: article.category || "Hormones",
       content: "",
-    })
-    setIsEditArticleDialogOpen(true)
+    });
+    setIsEditArticleDialogOpen(true);
 
-    if (typeof article.id !== "string") return
+    if (typeof article.id !== "string") return;
 
     try {
-      const details = await getDoctorAdviceById(article.id)
+      const details = await getDoctorAdviceById(article.id);
       setEditArticleData({
         title: details?.title || article.title || "",
         category: details?.category || article.category || "Hormones",
         content: details?.textContent || "",
-      })
+      });
     } catch {
       // Keep optimistic values if details fetch fails.
     }
-  }
+  };
 
   const handleSaveArticleEdit = async () => {
-    if (!editingArticleId) return
-    const trimmedTitle = editArticleData.title.trim()
+    if (!editingArticleId) return;
+    const trimmedTitle = editArticleData.title.trim();
 
     if (!trimmedTitle) {
-      setPageMessage({ type: "error", text: "Article title is required." })
-      return
+      setPageMessage({ type: "error", text: "Article title is required." });
+      return;
     }
 
-    setIsSavingArticleEdit(true)
+    setIsSavingArticleEdit(true);
     try {
       if (typeof editingArticleId === "string") {
         const updated = await updateDoctorAdvice(editingArticleId, {
           title: trimmedTitle,
           category: editArticleData.category,
           textContent: editArticleData.content,
-        })
+        });
 
         setPublishedArticles((prev) =>
           prev.map((item: any) =>
@@ -677,9 +792,9 @@ export default function DoctorDashboardPage() {
                   category: updated?.category || editArticleData.category,
                   hasVoiceNote: Boolean(updated?.voiceUrl) || item.hasVoiceNote,
                 }
-              : item
-          )
-        )
+              : item,
+          ),
+        );
       } else {
         setPublishedArticles((prev) =>
           prev.map((item: any) =>
@@ -689,66 +804,85 @@ export default function DoctorDashboardPage() {
                   title: trimmedTitle,
                   category: editArticleData.category,
                 }
-              : item
-          )
-        )
+              : item,
+          ),
+        );
       }
 
-      setIsEditArticleDialogOpen(false)
-      setEditingArticleId(null)
-      setPageMessage({ type: "success", text: "Article updated successfully!" })
+      setIsEditArticleDialogOpen(false);
+      setEditingArticleId(null);
+      setPageMessage({
+        type: "success",
+        text: "Article updated successfully!",
+      });
     } catch {
-      setPageMessage({ type: "error", text: "Failed to update article. Please try again." })
+      setPageMessage({
+        type: "error",
+        text: "Failed to update article. Please try again.",
+      });
     } finally {
-      setIsSavingArticleEdit(false)
+      setIsSavingArticleEdit(false);
     }
-  }
+  };
 
   const handleDeletePublishedArticle = async (articleId: string | number) => {
-    const confirmed = window.confirm("Are you sure you want to delete this article?")
-    if (!confirmed) return
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this article?",
+    );
+    if (!confirmed) return;
 
-    setDeletingArticleId(articleId)
+    setDeletingArticleId(articleId);
     try {
       if (typeof articleId === "string") {
-        await deleteDoctorAdvice(articleId)
+        await deleteDoctorAdvice(articleId);
       }
 
-      setPublishedArticles((prev) => prev.filter((item: any) => item.id !== articleId))
+      setPublishedArticles((prev) =>
+        prev.filter((item: any) => item.id !== articleId),
+      );
       setDashboardSummary((prev) => ({
         ...prev,
         publishedArticles: Math.max(0, prev.publishedArticles - 1),
-      }))
-      setPageMessage({ type: "success", text: "Article deleted successfully!" })
+      }));
+      setPageMessage({
+        type: "success",
+        text: "Article deleted successfully!",
+      });
     } catch {
-      setPageMessage({ type: "error", text: "Failed to delete article. Please try again." })
+      setPageMessage({
+        type: "error",
+        text: "Failed to delete article. Please try again.",
+      });
     } finally {
-      setDeletingArticleId(null)
+      setDeletingArticleId(null);
     }
-  }
+  };
 
   const removeFile = (index: number) => {
-    setUploadedFiles((prev) => prev.filter((_, i) => i !== index))
-  }
+    setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return bytes + " B"
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB"
-    return (bytes / (1024 * 1024)).toFixed(1) + " MB"
-  }
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  };
 
   const getFileIcon = (type: string) => {
-    if (type.startsWith("image/")) return FileImage
-    if (type.includes("pdf")) return FileType
-    return File
-  }
+    if (type.startsWith("image/")) return FileImage;
+    if (type.includes("pdf")) return FileType;
+    return File;
+  };
 
   const handleSendMessage = async (type: "text" | "voice") => {
-    if (!selectedPatient || !doctorRecordId || !userId) return
+    if (!selectedPatient || !doctorRecordId || !userId) return;
 
     try {
-      const chat = await getOrCreateDoctorChat({ doctorId: doctorRecordId, userId: String(selectedPatient.id) })
-      if (!chat?._id) throw new Error("Unable to create/find chat")
+      const chat = await getOrCreateDoctorChat({
+        doctorId: doctorRecordId,
+        userId: String(selectedPatient.id),
+      });
+      if (!chat?._id) throw new Error("Unable to create/find chat");
 
       if (type === "text" && messageToSend.trim()) {
         await sendMessage({
@@ -757,9 +891,12 @@ export default function DoctorDashboardPage() {
           senderRole: "Doctor",
           messageType: "text",
           messageText: messageToSend,
-        })
-        setPageMessage({ type: "success", text: `Message sent to ${selectedPatient.username}` })
-        setMessageToSend("")
+        });
+        setPageMessage({
+          type: "success",
+          text: `Message sent to ${selectedPatient.username}`,
+        });
+        setMessageToSend("");
       } else if (type === "voice" && hasRecording) {
         await sendMessage({
           chatId: chat._id,
@@ -768,86 +905,103 @@ export default function DoctorDashboardPage() {
           messageType: "voice",
           voiceUrl: "local://voice-note",
           durationSec: recordingTime,
-        })
-        setPageMessage({ type: "success", text: `Insight sent to ${selectedPatient.username}` })
-        setHasRecording(false)
-        setRecordingTime(0)
-        setSendingVoiceNote(false)
+        });
+        setPageMessage({
+          type: "success",
+          text: `Insight sent to ${selectedPatient.username}`,
+        });
+        setHasRecording(false);
+        setRecordingTime(0);
+        setSendingVoiceNote(false);
       }
     } catch {
-      setPageMessage({ type: "error", text: "Failed to send message. Please try again." })
+      setPageMessage({
+        type: "error",
+        text: "Failed to send message. Please try again.",
+      });
     }
-  }
+  };
 
-  const filteredPatients = patients.filter(patient =>
-    patient.username.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredPatients = patients.filter((patient) =>
+    patient.username.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
 
   const toggleDayEnabled = (day: string) => {
-    setAvailability(prev => ({
+    setAvailability((prev) => ({
       ...prev,
       [day]: {
         ...prev[day],
         enabled: !prev[day].enabled,
-        slots: !prev[day].enabled ? [{ start: "09:00", end: "17:00" }] : prev[day].slots
-      }
-    }))
-  }
+        slots: !prev[day].enabled
+          ? [{ start: "09:00", end: "17:00" }]
+          : prev[day].slots,
+      },
+    }));
+  };
 
   const addTimeSlot = (day: string) => {
-    setAvailability(prev => ({
+    setAvailability((prev) => ({
       ...prev,
       [day]: {
         ...prev[day],
-        slots: [...prev[day].slots, { start: "09:00", end: "17:00" }]
-      }
-    }))
-  }
+        slots: [...prev[day].slots, { start: "09:00", end: "17:00" }],
+      },
+    }));
+  };
 
   const removeTimeSlot = (day: string, index: number) => {
-    setAvailability(prev => ({
+    setAvailability((prev) => ({
       ...prev,
       [day]: {
         ...prev[day],
-        slots: prev[day].slots.filter((_, i) => i !== index)
-      }
-    }))
-  }
+        slots: prev[day].slots.filter((_, i) => i !== index),
+      },
+    }));
+  };
 
-  const updateTimeSlot = (day: string, index: number, field: "start" | "end", value: string) => {
-    setAvailability(prev => ({
+  const updateTimeSlot = (
+    day: string,
+    index: number,
+    field: "start" | "end",
+    value: string,
+  ) => {
+    setAvailability((prev) => ({
       ...prev,
       [day]: {
         ...prev[day],
-        slots: prev[day].slots.map((slot, i) => 
-          i === index ? { ...slot, [field]: value } : slot
-        )
-      }
-    }))
-  }
+        slots: prev[day].slots.map((slot, i) =>
+          i === index ? { ...slot, [field]: value } : slot,
+        ),
+      },
+    }));
+  };
 
   const handleSaveAvailability = () => {
-    setIsSavingAvailability(true)
+    setIsSavingAvailability(true);
     // Simulate API call
     setTimeout(() => {
-      setIsSavingAvailability(false)
-      alert("Availability saved successfully!")
-    }, 1000)
-  }
+      setIsSavingAvailability(false);
+      alert("Availability saved successfully!");
+    }, 1000);
+  };
 
   const getTotalHours = () => {
-    let total = 0
-    Object.values(availability).forEach(day => {
+    let total = 0;
+    Object.values(availability).forEach((day) => {
       if (day.enabled) {
-        day.slots.forEach(slot => {
-          const start = parseInt(slot.start.split(":")[0]) + parseInt(slot.start.split(":")[1]) / 60
-          const end = parseInt(slot.end.split(":")[0]) + parseInt(slot.end.split(":")[1]) / 60
-          total += end - start
-        })
+        day.slots.forEach((slot) => {
+          const start =
+            parseInt(slot.start.split(":")[0]) +
+            parseInt(slot.start.split(":")[1]) / 60;
+          const end =
+            parseInt(slot.end.split(":")[0]) +
+            parseInt(slot.end.split(":")[1]) / 60;
+          total += end - start;
+        });
       }
-    })
-    return total.toFixed(1)
-  }
+    });
+    return total.toFixed(1);
+  };
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -870,7 +1024,11 @@ export default function DoctorDashboardPage() {
               : ""
           }
         >
-          {pageMessage.type === "error" ? <CircleAlert className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+          {pageMessage.type === "error" ? (
+            <CircleAlert className="h-4 w-4" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4" />
+          )}
           <AlertDescription>{pageMessage.text}</AlertDescription>
         </Alert>
       )}
@@ -883,7 +1041,9 @@ export default function DoctorDashboardPage() {
               <Users className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <p className="text-xl font-semibold">{dashboardSummary.patients}</p>
+              <p className="text-xl font-semibold">
+                {dashboardSummary.patients}
+              </p>
               <p className="text-xs text-muted-foreground">Patients</p>
             </div>
           </CardContent>
@@ -907,7 +1067,9 @@ export default function DoctorDashboardPage() {
               <FileText className="h-4 w-4 text-muted-foreground" />
             </div>
             <div>
-              <p className="text-xl font-semibold">{dashboardSummary.publishedArticles}</p>
+              <p className="text-xl font-semibold">
+                {dashboardSummary.publishedArticles}
+              </p>
               <p className="text-xs text-muted-foreground">Articles</p>
             </div>
           </CardContent>
@@ -919,10 +1081,14 @@ export default function DoctorDashboardPage() {
             </div>
             <div>
               <div className="flex items-center gap-1">
-                <p className="text-xl font-semibold">{dashboardSummary.ratingAverage || ratingStats.average}</p>
+                <p className="text-xl font-semibold">
+                  {dashboardSummary.ratingAverage || ratingStats.average}
+                </p>
                 <Star className="h-3 w-3 fill-primary text-primary" />
               </div>
-              <p className="text-xs text-muted-foreground">{dashboardSummary.ratingTotal || ratingStats.total} reviews</p>
+              <p className="text-xs text-muted-foreground">
+                {dashboardSummary.ratingTotal || ratingStats.total} reviews
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -968,7 +1134,10 @@ export default function DoctorDashboardPage() {
 
           <div className="space-y-3">
             {filteredPatients.map((patient) => (
-              <Card key={patient.id} className="overflow-hidden transition-all hover:shadow-md">
+              <Card
+                key={patient.id}
+                className="overflow-hidden transition-all hover:shadow-md"
+              >
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -984,15 +1153,22 @@ export default function DoctorDashboardPage() {
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-medium">{patient.username}</span>
-                          <Badge 
-                            variant={patient.tier === "premium" ? "default" : "outline"}
+                          <span className="font-medium">
+                            {patient.username}
+                          </span>
+                          <Badge
+                            variant={
+                              patient.tier === "premium" ? "default" : "outline"
+                            }
                             className="h-5 text-[10px]"
                           >
                             {patient.tier}
                           </Badge>
                           {patient.unreadMessages > 0 && (
-                            <Badge variant="destructive" className="h-5 w-5 rounded-full p-0 text-[10px] flex items-center justify-center">
+                            <Badge
+                              variant="destructive"
+                              className="h-5 w-5 rounded-full p-0 text-[10px] flex items-center justify-center"
+                            >
                               {patient.unreadMessages}
                             </Badge>
                           )}
@@ -1012,8 +1188,8 @@ export default function DoctorDashboardPage() {
                     <div className="flex items-center gap-2">
                       <Dialog>
                         <DialogTrigger asChild>
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             size="sm"
                             onClick={() => setSelectedPatient(patient)}
                           >
@@ -1023,7 +1199,9 @@ export default function DoctorDashboardPage() {
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-lg">
                           <DialogHeader>
-                            <DialogTitle>Send Message to {patient.username}</DialogTitle>
+                            <DialogTitle>
+                              Send Message to {patient.username}
+                            </DialogTitle>
                             <DialogDescription>
                               Send a text message or insight to your patient
                             </DialogDescription>
@@ -1031,8 +1209,13 @@ export default function DoctorDashboardPage() {
                           <div className="space-y-4 py-4">
                             <Tabs defaultValue="text" className="w-full">
                               <TabsList className="grid w-full grid-cols-2">
-                                <TabsTrigger value="text">Text Message</TabsTrigger>
-                                <TabsTrigger value="voice" onClick={() => setSendingVoiceNote(true)}>
+                                <TabsTrigger value="text">
+                                  Text Message
+                                </TabsTrigger>
+                                <TabsTrigger
+                                  value="voice"
+                                  onClick={() => setSendingVoiceNote(true)}
+                                >
                                   Insight
                                 </TabsTrigger>
                               </TabsList>
@@ -1041,7 +1224,9 @@ export default function DoctorDashboardPage() {
                                   placeholder="Type your message..."
                                   rows={4}
                                   value={messageToSend}
-                                  onChange={(e) => setMessageToSend(e.target.value)}
+                                  onChange={(e) =>
+                                    setMessageToSend(e.target.value)
+                                  }
                                 />
                               </TabsContent>
                               <TabsContent value="voice" className="mt-4">
@@ -1057,10 +1242,18 @@ export default function DoctorDashboardPage() {
                                             </div>
                                           </div>
                                           <div className="text-center">
-                                            <p className="text-xl font-mono font-semibold">{formatTime(recordingTime)}</p>
-                                            <p className="text-sm text-muted-foreground">Recording...</p>
+                                            <p className="text-xl font-mono font-semibold">
+                                              {formatTime(recordingTime)}
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                              Recording...
+                                            </p>
                                           </div>
-                                          <Button variant="destructive" size="sm" onClick={stopRecording}>
+                                          <Button
+                                            variant="destructive"
+                                            size="sm"
+                                            onClick={stopRecording}
+                                          >
                                             <Square className="mr-2 h-4 w-4" />
                                             Stop
                                           </Button>
@@ -1070,7 +1263,10 @@ export default function DoctorDashboardPage() {
                                           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
                                             <Mic className="h-6 w-6 text-primary" />
                                           </div>
-                                          <Button onClick={startRecording} size="sm">
+                                          <Button
+                                            onClick={startRecording}
+                                            size="sm"
+                                          >
                                             <Mic className="mr-2 h-4 w-4" />
                                             Start Recording
                                           </Button>
@@ -1086,11 +1282,26 @@ export default function DoctorDashboardPage() {
                                         Duration: {formatTime(recordingTime)}
                                       </p>
                                       <div className="flex gap-2">
-                                        <Button variant="outline" size="sm" onClick={() => setIsPlaying(!isPlaying)}>
-                                          {isPlaying ? <PauseCircle className="mr-2 h-4 w-4" /> : <PlayCircle className="mr-2 h-4 w-4" />}
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() =>
+                                            setIsPlaying(!isPlaying)
+                                          }
+                                        >
+                                          {isPlaying ? (
+                                            <PauseCircle className="mr-2 h-4 w-4" />
+                                          ) : (
+                                            <PlayCircle className="mr-2 h-4 w-4" />
+                                          )}
                                           {isPlaying ? "Pause" : "Preview"}
                                         </Button>
-                                        <Button variant="outline" size="sm" onClick={deleteRecording} className="text-destructive">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={deleteRecording}
+                                          className="text-destructive"
+                                        >
                                           <Trash2 className="mr-2 h-4 w-4" />
                                           Delete
                                         </Button>
@@ -1102,9 +1313,15 @@ export default function DoctorDashboardPage() {
                             </Tabs>
                           </div>
                           <DialogFooter>
-                            <Button 
-                              onClick={() => handleSendMessage(sendingVoiceNote && hasRecording ? "voice" : "text")}
-                              disabled={(!messageToSend.trim() && !hasRecording)}
+                            <Button
+                              onClick={() =>
+                                handleSendMessage(
+                                  sendingVoiceNote && hasRecording
+                                    ? "voice"
+                                    : "text",
+                                )
+                              }
+                              disabled={!messageToSend.trim() && !hasRecording}
                             >
                               <Send className="mr-2 h-4 w-4" />
                               Send
@@ -1127,7 +1344,9 @@ export default function DoctorDashboardPage() {
               <Users className="mx-auto h-12 w-12 text-muted-foreground/50" />
               <h3 className="mt-4 text-lg font-medium">No patients found</h3>
               <p className="mt-2 text-sm text-muted-foreground">
-                {searchQuery ? "Try a different search term" : "Your patients will appear here"}
+                {searchQuery
+                  ? "Try a different search term"
+                  : "Your patients will appear here"}
               </p>
             </div>
           )}
@@ -1145,8 +1364,12 @@ export default function DoctorDashboardPage() {
                   </CardDescription>
                 </div>
                 <div className="text-right">
-                  <p className="text-2xl font-bold text-primary">{getTotalHours()}h</p>
-                  <p className="text-xs text-muted-foreground">Total weekly hours</p>
+                  <p className="text-2xl font-bold text-primary">
+                    {getTotalHours()}h
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Total weekly hours
+                  </p>
                 </div>
               </div>
             </CardHeader>
@@ -1159,10 +1382,13 @@ export default function DoctorDashboardPage() {
                         checked={availability[day]?.enabled || false}
                         onCheckedChange={() => toggleDayEnabled(day)}
                       />
-                      <span className={cn(
-                        "font-medium",
-                        !availability[day]?.enabled && "text-muted-foreground"
-                      )}>
+                      <span
+                        className={cn(
+                          "font-medium",
+                          !availability[day]?.enabled &&
+                            "text-muted-foreground",
+                        )}
+                      >
                         {day}
                       </span>
                     </div>
@@ -1178,59 +1404,83 @@ export default function DoctorDashboardPage() {
                       </Button>
                     )}
                   </div>
-                  
-                  {availability[day]?.enabled && availability[day].slots.length > 0 && (
-                    <div className="mt-4 space-y-3">
-                      {availability[day].slots.map((slot, index) => (
-                        <div key={index} className="flex items-center gap-3">
-                          <div className="flex items-center gap-2 flex-1">
-                            <select
-                              className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-                              value={slot.start}
-                              onChange={(e) => updateTimeSlot(day, index, "start", e.target.value)}
-                            >
-                              {timeSlots.map(time => (
-                                <option key={time} value={time}>{time}</option>
-                              ))}
-                            </select>
-                            <span className="text-muted-foreground">to</span>
-                            <select
-                              className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-                              value={slot.end}
-                              onChange={(e) => updateTimeSlot(day, index, "end", e.target.value)}
-                            >
-                              {timeSlots.map(time => (
-                                <option key={time} value={time}>{time}</option>
-                              ))}
-                            </select>
+
+                  {availability[day]?.enabled &&
+                    availability[day].slots.length > 0 && (
+                      <div className="mt-4 space-y-3">
+                        {availability[day].slots.map((slot, index) => (
+                          <div key={index} className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 flex-1">
+                              <select
+                                className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                value={slot.start}
+                                onChange={(e) =>
+                                  updateTimeSlot(
+                                    day,
+                                    index,
+                                    "start",
+                                    e.target.value,
+                                  )
+                                }
+                              >
+                                {timeSlots.map((time) => (
+                                  <option key={time} value={time}>
+                                    {time}
+                                  </option>
+                                ))}
+                              </select>
+                              <span className="text-muted-foreground">to</span>
+                              <select
+                                className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                value={slot.end}
+                                onChange={(e) =>
+                                  updateTimeSlot(
+                                    day,
+                                    index,
+                                    "end",
+                                    e.target.value,
+                                  )
+                                }
+                              >
+                                {timeSlots.map((time) => (
+                                  <option key={time} value={time}>
+                                    {time}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            {availability[day].slots.length > 1 && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={() => removeTimeSlot(day, index)}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
-                          {availability[day].slots.length > 1 && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={() => removeTimeSlot(day, index)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  
-                  {availability[day]?.enabled && availability[day].slots.length === 0 && (
-                    <p className="mt-3 text-sm text-muted-foreground">
-                      No time slots added. Click &quot;Add Slot&quot; to set your hours.
-                    </p>
-                  )}
+                        ))}
+                      </div>
+                    )}
+
+                  {availability[day]?.enabled &&
+                    availability[day].slots.length === 0 && (
+                      <p className="mt-3 text-sm text-muted-foreground">
+                        No time slots added. Click &quot;Add Slot&quot; to set
+                        your hours.
+                      </p>
+                    )}
                 </div>
               ))}
             </CardContent>
           </Card>
 
           <div className="flex justify-end">
-            <Button onClick={handleSaveAvailability} disabled={isSavingAvailability}>
+            <Button
+              onClick={handleSaveAvailability}
+              disabled={isSavingAvailability}
+            >
               {isSavingAvailability ? (
                 <>
                   <Clock className="mr-2 h-4 w-4 animate-spin" />
@@ -1254,7 +1504,9 @@ export default function DoctorDashboardPage() {
               <CardContent className="p-6">
                 <div className="flex flex-col items-center text-center">
                   <div className="flex items-baseline gap-1">
-                    <span className="text-5xl font-bold">{ratingStats.average}</span>
+                    <span className="text-5xl font-bold">
+                      {ratingStats.average}
+                    </span>
                     <span className="text-2xl text-muted-foreground">/5</span>
                   </div>
                   <div className="mt-2 flex items-center gap-1">
@@ -1265,7 +1517,7 @@ export default function DoctorDashboardPage() {
                           "h-5 w-5",
                           i < Math.floor(ratingStats.average)
                             ? "fill-secondary-foreground text-secondary-foreground"
-                            : "text-muted"
+                            : "text-muted",
                         )}
                       />
                     ))}
@@ -1276,7 +1528,8 @@ export default function DoctorDashboardPage() {
                   <div className="mt-4 flex items-center gap-2 text-sm">
                     <TrendingUp className="h-4 w-4 text-secondary-foreground" />
                     <span className="text-secondary-foreground font-medium">
-                      +{ratingStats.thisMonth - ratingStats.lastMonth} reviews this month
+                      +{ratingStats.thisMonth - ratingStats.lastMonth} reviews
+                      this month
                     </span>
                   </div>
                 </div>
@@ -1328,16 +1581,24 @@ export default function DoctorDashboardPage() {
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">
-                          <AvatarFallback className={cn(
-                            "text-sm",
-                            review.anonymous ? "bg-muted" : "bg-primary/10 text-primary"
-                          )}>
-                            {review.anonymous ? "?" : review.user.slice(0, 2).toUpperCase()}
+                          <AvatarFallback
+                            className={cn(
+                              "text-sm",
+                              review.anonymous
+                                ? "bg-muted"
+                                : "bg-primary/10 text-primary",
+                            )}
+                          >
+                            {review.anonymous
+                              ? "?"
+                              : review.user.slice(0, 2).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                         <div>
                           <p className="font-medium">{review.user}</p>
-                          <p className="text-xs text-muted-foreground">{review.date}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {review.date}
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-0.5">
@@ -1348,13 +1609,15 @@ export default function DoctorDashboardPage() {
                               "h-4 w-4",
                               i < review.rating
                                 ? "fill-secondary-foreground text-secondary-foreground"
-                                : "text-muted"
+                                : "text-muted",
                             )}
                           />
                         ))}
                       </div>
                     </div>
-                    <p className="mt-3 text-sm text-muted-foreground">{review.comment}</p>
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      {review.comment}
+                    </p>
                   </CardContent>
                 </Card>
               ))}
@@ -1393,7 +1656,9 @@ export default function DoctorDashboardPage() {
                     id="title"
                     placeholder="Enter article title..."
                     value={articleData.title}
-                    onChange={(e) => setArticleData({ ...articleData, title: e.target.value })}
+                    onChange={(e) =>
+                      setArticleData({ ...articleData, title: e.target.value })
+                    }
                   />
                 </div>
                 <div className="space-y-2">
@@ -1402,10 +1667,17 @@ export default function DoctorDashboardPage() {
                     id="category"
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                     value={articleData.category}
-                    onChange={(e) => setArticleData({ ...articleData, category: e.target.value })}
+                    onChange={(e) =>
+                      setArticleData({
+                        ...articleData,
+                        category: e.target.value,
+                      })
+                    }
                   >
-                    {categories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
+                    {categories.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -1418,7 +1690,9 @@ export default function DoctorDashboardPage() {
                   placeholder="Write your article content here..."
                   rows={10}
                   value={articleData.content}
-                  onChange={(e) => setArticleData({ ...articleData, content: e.target.value })}
+                  onChange={(e) =>
+                    setArticleData({ ...articleData, content: e.target.value })
+                  }
                   className="resize-none"
                 />
               </div>
@@ -1446,9 +1720,9 @@ export default function DoctorDashboardPage() {
                 onChange={handleFileUpload}
                 className="hidden"
               />
-              
+
               {/* Drop zone / Upload button */}
-              <div 
+              <div
                 className="flex flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed border-border bg-muted/30 p-8 transition-colors hover:border-primary/50 hover:bg-muted/50 cursor-pointer"
                 onClick={() => fileInputRef.current?.click()}
               >
@@ -1457,7 +1731,9 @@ export default function DoctorDashboardPage() {
                     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
                       <Upload className="h-6 w-6 text-primary animate-pulse" />
                     </div>
-                    <p className="text-sm text-muted-foreground">Uploading...</p>
+                    <p className="text-sm text-muted-foreground">
+                      Uploading...
+                    </p>
                   </>
                 ) : (
                   <>
@@ -1480,9 +1756,9 @@ export default function DoctorDashboardPage() {
                   <Label>Uploaded Files ({uploadedFiles.length})</Label>
                   <div className="space-y-2">
                     {uploadedFiles.map((file, index) => {
-                      const FileIcon = getFileIcon(file.type)
+                      const FileIcon = getFileIcon(file.type);
                       return (
-                        <div 
+                        <div
                           key={index}
                           className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background p-3"
                         >
@@ -1491,28 +1767,36 @@ export default function DoctorDashboardPage() {
                               <FileIcon className="h-5 w-5 text-muted-foreground" />
                             </div>
                             <div>
-                              <p className="text-sm font-medium truncate max-w-[200px]">{file.name}</p>
-                              <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
+                              <p className="text-sm font-medium truncate max-w-[200px]">
+                                {file.name}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatFileSize(file.size)}
+                              </p>
                             </div>
                           </div>
                           <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                            >
                               <Download className="h-4 w-4" />
                             </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
+                            <Button
+                              variant="ghost"
+                              size="icon"
                               className="h-8 w-8 text-destructive hover:text-destructive"
                               onClick={(e) => {
-                                e.stopPropagation()
-                                removeFile(index)
+                                e.stopPropagation();
+                                removeFile(index);
                               }}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </div>
-                      )
+                      );
                     })}
                   </div>
                 </div>
@@ -1543,8 +1827,12 @@ export default function DoctorDashboardPage() {
                           </div>
                         </div>
                         <div className="text-center">
-                          <p className="text-2xl font-mono font-semibold">{formatTime(recordingTime)}</p>
-                          <p className="text-sm text-muted-foreground">Recording...</p>
+                          <p className="text-2xl font-mono font-semibold">
+                            {formatTime(recordingTime)}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Recording...
+                          </p>
                         </div>
                         <Button variant="destructive" onClick={stopRecording}>
                           <Square className="mr-2 h-4 w-4" />
@@ -1581,17 +1869,34 @@ export default function DoctorDashboardPage() {
                     </div>
                     <div className="text-center">
                       <p className="font-medium">Insight recorded</p>
-                      <p className="text-sm text-muted-foreground">Duration: {formatTime(recordingTime)}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Duration: {formatTime(recordingTime)}
+                      </p>
                       {uploadedAudio?.name && (
-                        <p className="text-xs text-muted-foreground">{uploadedAudio.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {uploadedAudio.name}
+                        </p>
                       )}
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setIsPlaying(!isPlaying)}>
-                        {isPlaying ? <PauseCircle className="mr-2 h-4 w-4" /> : <PlayCircle className="mr-2 h-4 w-4" />}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsPlaying(!isPlaying)}
+                      >
+                        {isPlaying ? (
+                          <PauseCircle className="mr-2 h-4 w-4" />
+                        ) : (
+                          <PlayCircle className="mr-2 h-4 w-4" />
+                        )}
                         {isPlaying ? "Pause" : "Preview"}
                       </Button>
-                      <Button variant="outline" size="sm" onClick={deleteRecording} className="text-destructive hover:text-destructive">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={deleteRecording}
+                        className="text-destructive hover:text-destructive"
+                      >
                         <Trash2 className="mr-2 h-4 w-4" />
                         Delete
                       </Button>
@@ -1646,7 +1951,11 @@ export default function DoctorDashboardPage() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => handleOpenEditArticle(article)}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenEditArticle(article)}
+                    >
                       Edit
                     </Button>
                     <Button
@@ -1666,7 +1975,10 @@ export default function DoctorDashboardPage() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={isEditArticleDialogOpen} onOpenChange={setIsEditArticleDialogOpen}>
+      <Dialog
+        open={isEditArticleDialogOpen}
+        onOpenChange={setIsEditArticleDialogOpen}
+      >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Edit Article</DialogTitle>
@@ -1682,7 +1994,10 @@ export default function DoctorDashboardPage() {
                 id="edit-article-title"
                 value={editArticleData.title}
                 onChange={(e) =>
-                  setEditArticleData((prev) => ({ ...prev, title: e.target.value }))
+                  setEditArticleData((prev) => ({
+                    ...prev,
+                    title: e.target.value,
+                  }))
                 }
               />
             </div>
@@ -1694,7 +2009,10 @@ export default function DoctorDashboardPage() {
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={editArticleData.category}
                 onChange={(e) =>
-                  setEditArticleData((prev) => ({ ...prev, category: e.target.value }))
+                  setEditArticleData((prev) => ({
+                    ...prev,
+                    category: e.target.value,
+                  }))
                 }
               >
                 {categories.map((cat) => (
@@ -1712,22 +2030,31 @@ export default function DoctorDashboardPage() {
                 rows={8}
                 value={editArticleData.content}
                 onChange={(e) =>
-                  setEditArticleData((prev) => ({ ...prev, content: e.target.value }))
+                  setEditArticleData((prev) => ({
+                    ...prev,
+                    content: e.target.value,
+                  }))
                 }
               />
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditArticleDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsEditArticleDialogOpen(false)}
+            >
               Cancel
             </Button>
-            <Button onClick={handleSaveArticleEdit} disabled={isSavingArticleEdit}>
+            <Button
+              onClick={handleSaveArticleEdit}
+              disabled={isSavingArticleEdit}
+            >
               {isSavingArticleEdit ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

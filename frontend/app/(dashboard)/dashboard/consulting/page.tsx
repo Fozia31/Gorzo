@@ -1,21 +1,33 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useRef } from "react"
-import * as chatApi from "@/api/chatApi"
-import { getConsultationAccess } from "@/api/paymentApi"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
-import { useAuth } from "@/lib/auth-context"
-import { getDoctorRatings, getDoctorRatingStats, getDoctors, submitDoctorRating } from "@/api/doctorApi"
-import { getChats, getOrCreateDoctorChat } from "@/api/chatApi"
-import { getMessagesByChat, sendMessage } from "@/api/messageApi"
-import { 
+import { useState, useEffect, useRef } from "react";
+import * as chatApi from "@/api/chatApi";
+import { getConsultationAccess } from "@/api/paymentApi";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { useAuth } from "@/lib/auth-context";
+import {
+  getDoctorRatings,
+  getDoctorRatingStats,
+  getDoctors,
+  submitDoctorRating,
+} from "@/api/doctorApi";
+import { getChats, getOrCreateDoctorChat } from "@/api/chatApi";
+import { getMessagesByChat, sendMessage } from "@/api/messageApi";
+import {
   Crown,
   MessageCircle,
   Star,
@@ -33,10 +45,10 @@ import {
   Trash2,
   AlertTriangle,
   Plus,
-  Lock
-} from "lucide-react"
-import { cn } from "@/lib/utils"
-import Link from "next/link"
+  Lock,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import Link from "next/link";
 import {
   Dialog,
   DialogContent,
@@ -44,7 +56,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,7 +66,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
 
 // Sample doctors with ratings, reviews, and availability
 const doctors = [
@@ -71,19 +83,58 @@ const doctors = [
     bio: "Specialized in women's reproductive health, pregnancy care, and hormonal disorders.",
     consultationFee: 299,
     availability: {
-      Monday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }, { start: "14:00", end: "17:00" }] },
-      Tuesday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }, { start: "14:00", end: "17:00" }] },
+      Monday: {
+        enabled: true,
+        slots: [
+          { start: "09:00", end: "12:00" },
+          { start: "14:00", end: "17:00" },
+        ],
+      },
+      Tuesday: {
+        enabled: true,
+        slots: [
+          { start: "09:00", end: "12:00" },
+          { start: "14:00", end: "17:00" },
+        ],
+      },
       Wednesday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }] },
-      Thursday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }, { start: "14:00", end: "17:00" }] },
+      Thursday: {
+        enabled: true,
+        slots: [
+          { start: "09:00", end: "12:00" },
+          { start: "14:00", end: "17:00" },
+        ],
+      },
       Friday: { enabled: true, slots: [{ start: "09:00", end: "12:00" }] },
       Saturday: { enabled: false, slots: [] },
       Sunday: { enabled: false, slots: [] },
     },
     reviews: [
-      { id: 1, user: "Anonymous User", rating: 5, comment: "Very professional and caring. Made me feel comfortable discussing sensitive topics.", date: "2 weeks ago" },
-      { id: 2, user: "HealthyMama22", rating: 5, comment: "Dr. Amara helped me understand my cycle better. Highly recommend!", date: "1 month ago" },
-      { id: 3, user: "WellnessJourney", rating: 4, comment: "Good advice, though response took a bit longer than expected.", date: "1 month ago" },
-    ]
+      {
+        id: 1,
+        user: "Anonymous User",
+        rating: 5,
+        comment:
+          "Very professional and caring. Made me feel comfortable discussing sensitive topics.",
+        date: "2 weeks ago",
+      },
+      {
+        id: 2,
+        user: "HealthyMama22",
+        rating: 5,
+        comment:
+          "Dr. Amara helped me understand my cycle better. Highly recommend!",
+        date: "1 month ago",
+      },
+      {
+        id: 3,
+        user: "WellnessJourney",
+        rating: 4,
+        comment:
+          "Good advice, though response took a bit longer than expected.",
+        date: "1 month ago",
+      },
+    ],
   },
   {
     id: 2,
@@ -98,19 +149,57 @@ const doctors = [
     bio: "Expert in women's nutrition, weight management, and dietary planning for hormonal balance.",
     consultationFee: 249,
     availability: {
-      Monday: { enabled: true, slots: [{ start: "10:00", end: "13:00" }, { start: "15:00", end: "18:00" }] },
+      Monday: {
+        enabled: true,
+        slots: [
+          { start: "10:00", end: "13:00" },
+          { start: "15:00", end: "18:00" },
+        ],
+      },
       Tuesday: { enabled: true, slots: [{ start: "10:00", end: "13:00" }] },
-      Wednesday: { enabled: true, slots: [{ start: "10:00", end: "13:00" }, { start: "15:00", end: "18:00" }] },
+      Wednesday: {
+        enabled: true,
+        slots: [
+          { start: "10:00", end: "13:00" },
+          { start: "15:00", end: "18:00" },
+        ],
+      },
       Thursday: { enabled: true, slots: [{ start: "10:00", end: "13:00" }] },
-      Friday: { enabled: true, slots: [{ start: "10:00", end: "13:00" }, { start: "15:00", end: "18:00" }] },
+      Friday: {
+        enabled: true,
+        slots: [
+          { start: "10:00", end: "13:00" },
+          { start: "15:00", end: "18:00" },
+        ],
+      },
       Saturday: { enabled: true, slots: [{ start: "10:00", end: "14:00" }] },
       Sunday: { enabled: false, slots: [] },
     },
     reviews: [
-      { id: 1, user: "FitnessFocus", rating: 5, comment: "Her meal plans are practical and easy to follow. Lost 5kg in 2 months!", date: "3 weeks ago" },
-      { id: 2, user: "BusyMom123", rating: 5, comment: "Finally found a nutritionist who understands Ethiopian food culture.", date: "1 month ago" },
-      { id: 3, user: "Anonymous User", rating: 4, comment: "Very knowledgeable. Helped me with my PCOS diet.", date: "2 months ago" },
-    ]
+      {
+        id: 1,
+        user: "FitnessFocus",
+        rating: 5,
+        comment:
+          "Her meal plans are practical and easy to follow. Lost 5kg in 2 months!",
+        date: "3 weeks ago",
+      },
+      {
+        id: 2,
+        user: "BusyMom123",
+        rating: 5,
+        comment:
+          "Finally found a nutritionist who understands Ethiopian food culture.",
+        date: "1 month ago",
+      },
+      {
+        id: 3,
+        user: "Anonymous User",
+        rating: 4,
+        comment: "Very knowledgeable. Helped me with my PCOS diet.",
+        date: "2 months ago",
+      },
+    ],
   },
   {
     id: 3,
@@ -134,10 +223,30 @@ const doctors = [
       Sunday: { enabled: false, slots: [] },
     },
     reviews: [
-      { id: 1, user: "HopefulMother", rating: 5, comment: "Dr. Hana gave me hope when I was struggling with fertility issues.", date: "1 week ago" },
-      { id: 2, user: "Anonymous User", rating: 5, comment: "Extremely compassionate and thorough. Best doctor I've consulted.", date: "3 weeks ago" },
-      { id: 3, user: "NewMom2024", rating: 5, comment: "She guided me through my entire pregnancy journey.", date: "2 months ago" },
-    ]
+      {
+        id: 1,
+        user: "HopefulMother",
+        rating: 5,
+        comment:
+          "Dr. Hana gave me hope when I was struggling with fertility issues.",
+        date: "1 week ago",
+      },
+      {
+        id: 2,
+        user: "Anonymous User",
+        rating: 5,
+        comment:
+          "Extremely compassionate and thorough. Best doctor I've consulted.",
+        date: "3 weeks ago",
+      },
+      {
+        id: 3,
+        user: "NewMom2024",
+        rating: 5,
+        comment: "She guided me through my entire pregnancy journey.",
+        date: "2 months ago",
+      },
+    ],
   },
   {
     id: 4,
@@ -153,94 +262,124 @@ const doctors = [
     consultationFee: 279,
     availability: {
       Monday: { enabled: true, slots: [{ start: "08:00", end: "12:00" }] },
-      Tuesday: { enabled: true, slots: [{ start: "08:00", end: "12:00" }, { start: "14:00", end: "16:00" }] },
+      Tuesday: {
+        enabled: true,
+        slots: [
+          { start: "08:00", end: "12:00" },
+          { start: "14:00", end: "16:00" },
+        ],
+      },
       Wednesday: { enabled: false, slots: [] },
-      Thursday: { enabled: true, slots: [{ start: "08:00", end: "12:00" }, { start: "14:00", end: "16:00" }] },
+      Thursday: {
+        enabled: true,
+        slots: [
+          { start: "08:00", end: "12:00" },
+          { start: "14:00", end: "16:00" },
+        ],
+      },
       Friday: { enabled: true, slots: [{ start: "08:00", end: "12:00" }] },
       Saturday: { enabled: false, slots: [] },
       Sunday: { enabled: false, slots: [] },
     },
     reviews: [
-      { id: 1, user: "Anonymous User", rating: 5, comment: "Finally someone who understands the mental load women carry.", date: "1 week ago" },
-      { id: 2, user: "StrongWoman", rating: 4, comment: "Helpful sessions, though I wish there were more follow-ups.", date: "1 month ago" },
-      { id: 3, user: "NewMomStruggles", rating: 5, comment: "Helped me through postpartum anxiety. Forever grateful.", date: "6 weeks ago" },
-    ]
+      {
+        id: 1,
+        user: "Anonymous User",
+        rating: 5,
+        comment: "Finally someone who understands the mental load women carry.",
+        date: "1 week ago",
+      },
+      {
+        id: 2,
+        user: "StrongWoman",
+        rating: 4,
+        comment: "Helpful sessions, though I wish there were more follow-ups.",
+        date: "1 month ago",
+      },
+      {
+        id: 3,
+        user: "NewMomStruggles",
+        rating: 5,
+        comment: "Helped me through postpartum anxiety. Forever grateful.",
+        date: "6 weeks ago",
+      },
+    ],
   },
-]
+];
 // Chat Room type
 type ChatRoom = {
-  id: string
-  doctor: DoctorProfile
-  createdAt: string
+  id: string;
+  doctor: DoctorProfile;
+  createdAt: string;
   messages: {
-    id: number | string
-    sender: "user" | "doctor"
-    content: string
-    time: string
-  }[]
-}
+    id: number | string;
+    sender: "user" | "doctor";
+    content: string;
+    time: string;
+  }[];
+};
 
 type PageMessage = {
-  type: "success" | "error"
-  text: string
-}
+  type: "success" | "error";
+  text: string;
+};
 
 const formatChatTime = (dateValue?: string | Date) => {
-  if (!dateValue) return "Just now"
-  const date = new Date(dateValue)
-  if (Number.isNaN(date.getTime())) return "Just now"
+  if (!dateValue) return "Just now";
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return "Just now";
 
-  const diffMs = Date.now() - date.getTime()
-  const minutes = Math.floor(diffMs / (1000 * 60))
-  if (minutes < 1) return "Just now"
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
+  const diffMs = Date.now() - date.getTime();
+  const minutes = Math.floor(diffMs / (1000 * 60));
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+};
 
 const mapBackendMessageToUi = (item: any) => ({
   id: item?._id || `${Date.now()}`,
   sender: item?.senderRole === "Doctor" ? "doctor" : "user",
   content: item?.messageType === "voice" ? "Insight" : item?.messageText || "",
   time: formatChatTime(item?.createdAt),
-})
+});
 
 // Rating Dialog Component
 function RatingDialog({
   doctor,
   open,
   onClose,
-  onSubmit
+  onSubmit,
 }: {
-  doctor: DoctorProfile | null
-  open: boolean
-  onClose: () => void
-  onSubmit: (rating: number, comment: string, anonymous: boolean) => void
+  doctor: DoctorProfile | null;
+  open: boolean;
+  onClose: () => void;
+  onSubmit: (rating: number, comment: string, anonymous: boolean) => void;
 }) {
-  const [rating, setRating] = useState(0)
-  const [hoverRating, setHoverRating] = useState(0)
-  const [comment, setComment] = useState("")
-  const [anonymous, setAnonymous] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [comment, setComment] = useState("");
+  const [anonymous, setAnonymous] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
-  if (!doctor) return null
+  if (!doctor) return null;
 
   const handleSubmit = () => {
-    if (rating === 0) return
-    onSubmit(rating, comment, anonymous)
-    setSubmitted(true)
-  }
+    if (rating === 0) return;
+    onSubmit(rating, comment, anonymous);
+    setSubmitted(true);
+  };
 
   const handleClose = () => {
-    setRating(0)
-    setHoverRating(0)
-    setComment("")
-    setAnonymous(false)
-    setSubmitted(false)
-    onClose()
-  }
+    setRating(0);
+    setHoverRating(0);
+    setComment("");
+    setAnonymous(false);
+    setSubmitted(false);
+    onClose();
+  };
 
   if (submitted) {
     return (
@@ -252,7 +391,8 @@ function RatingDialog({
             </div>
             <h2 className="mt-4 text-xl font-semibold">Thank You!</h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              Your feedback helps other women find the right doctor and helps {doctor.name} improve their service.
+              Your feedback helps other women find the right doctor and helps{" "}
+              {doctor.name} improve their service.
             </p>
             <Button onClick={handleClose} className="mt-6">
               Close
@@ -260,7 +400,7 @@ function RatingDialog({
           </div>
         </DialogContent>
       </Dialog>
-    )
+    );
   }
 
   return (
@@ -282,12 +422,17 @@ function RatingDialog({
             <Avatar className="h-12 w-12">
               <AvatarImage src={doctor.avatar} />
               <AvatarFallback className="bg-secondary text-secondary-foreground">
-                {doctor.name.split(' ').map(n => n[0]).join('')}
+                {doctor.name
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")}
               </AvatarFallback>
             </Avatar>
             <div>
               <p className="font-medium">{doctor.name}</p>
-              <p className="text-sm text-muted-foreground">{doctor.specialty}</p>
+              <p className="text-sm text-muted-foreground">
+                {doctor.specialty}
+              </p>
             </div>
           </div>
 
@@ -309,7 +454,7 @@ function RatingDialog({
                       "h-8 w-8 transition-colors",
                       (hoverRating || rating) >= star
                         ? "fill-secondary-foreground text-secondary-foreground"
-                        : "text-muted"
+                        : "text-muted",
                     )}
                   />
                 </button>
@@ -349,13 +494,13 @@ function RatingDialog({
               onClick={() => setAnonymous(!anonymous)}
               className={cn(
                 "relative h-6 w-11 rounded-full transition-colors",
-                anonymous ? "bg-primary" : "bg-muted"
+                anonymous ? "bg-primary" : "bg-muted",
               )}
             >
               <span
                 className={cn(
                   "absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-background transition-transform shadow-sm",
-                  anonymous && "translate-x-5"
+                  anonymous && "translate-x-5",
                 )}
               />
             </button>
@@ -363,7 +508,11 @@ function RatingDialog({
         </div>
 
         <DialogFooter className="flex-col gap-2 sm:flex-col">
-          <Button onClick={handleSubmit} disabled={rating === 0} className="w-full gap-2">
+          <Button
+            onClick={handleSubmit}
+            disabled={rating === 0}
+            className="w-full gap-2"
+          >
             <Send className="h-4 w-4" />
             Submit Rating
           </Button>
@@ -373,38 +522,66 @@ function RatingDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
 
 // Helper function to get availability summary
-function getAvailabilitySummary(availability: typeof doctors[0]["availability"]) {
-  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-  const shortDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-  const availableDays = days.filter(day => availability[day]?.enabled)
-  
-  if (availableDays.length === 0) return "Currently unavailable"
-  if (availableDays.length === 7) return "Available all week"
-  if (availableDays.length >= 5 && !availability["Saturday"]?.enabled && !availability["Sunday"]?.enabled) {
-    return "Weekdays only"
+function getAvailabilitySummary(
+  availability: (typeof doctors)[0]["availability"],
+) {
+  const days = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+  ];
+  const shortDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const availableDays = days.filter((day) => availability[day]?.enabled);
+
+  if (availableDays.length === 0) return "Currently unavailable";
+  if (availableDays.length === 7) return "Available all week";
+  if (
+    availableDays.length >= 5 &&
+    !availability["Saturday"]?.enabled &&
+    !availability["Sunday"]?.enabled
+  ) {
+    return "Weekdays only";
   }
-  
-  return availableDays.map(d => shortDays[days.indexOf(d)]).join(", ")
+
+  return availableDays.map((d) => shortDays[days.indexOf(d)]).join(", ");
 }
 
 // Doctor Profile View with Reviews
-function DoctorProfileView({ 
-  doctor, 
-  onBack, 
+function DoctorProfileView({
+  doctor,
+  onBack,
   onContact,
   hasPaidAccess,
-}: { 
-  doctor: DoctorProfile
-  onBack: () => void
-  onContact: () => void
-  hasPaidAccess: boolean
+  canLoadMoreReviews,
+  onLoadMoreReviews,
+  isLoadingReviews,
+}: {
+  doctor: DoctorProfile;
+  onBack: () => void;
+  onContact: () => void;
+  hasPaidAccess: boolean;
+  canLoadMoreReviews: boolean;
+  onLoadMoreReviews: () => void;
+  isLoadingReviews: boolean;
 }) {
-  const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-  const shortDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+  const daysOfWeek = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+  ];
+  const shortDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -421,17 +598,24 @@ function DoctorProfileView({
             <Avatar className="h-24 w-24">
               <AvatarImage src={doctor.avatar} />
               <AvatarFallback className="bg-secondary text-secondary-foreground text-2xl">
-                {doctor.name.split(' ').map(n => n[0]).join('')}
+                {doctor.name
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 text-center md:text-left">
-              <h1 className="font-serif text-2xl font-semibold">{doctor.name}</h1>
+              <h1 className="font-serif text-2xl font-semibold">
+                {doctor.name}
+              </h1>
               <p className="text-muted-foreground">{doctor.specialty}</p>
               <div className="mt-2 flex items-center justify-center gap-4 md:justify-start">
                 <div className="flex items-center gap-1">
                   <Star className="h-4 w-4 fill-secondary-foreground text-secondary-foreground" />
                   <span className="font-semibold">{doctor.rating}</span>
-                  <span className="text-sm text-muted-foreground">({doctor.totalReviews} reviews)</span>
+                  <span className="text-sm text-muted-foreground">
+                    ({doctor.totalReviews} reviews)
+                  </span>
                 </div>
                 <Badge variant={doctor.available ? "default" : "secondary"}>
                   {doctor.available ? "Available" : "Unavailable"}
@@ -451,7 +635,7 @@ function DoctorProfileView({
             </div>
             <div className="w-full md:w-auto">
               {hasPaidAccess ? (
-                <Button 
+                <Button
                   onClick={onContact}
                   disabled={!doctor.available}
                   className="w-full gap-2"
@@ -462,14 +646,16 @@ function DoctorProfileView({
                 </Button>
               ) : (
                 <div className="space-y-2">
-                  <Button 
+                  <Button
                     onClick={onContact}
                     disabled={!doctor.available}
                     className="w-full gap-2"
                     size="lg"
                   >
                     <Crown className="h-4 w-4" />
-                    {doctor.available ? `Pay ${doctor.consultationFee} ETB` : "Currently Unavailable"}
+                    {doctor.available
+                      ? `Pay ${doctor.consultationFee} ETB`
+                      : "Currently Unavailable"}
                   </Button>
                   <p className="text-xs text-center text-muted-foreground">
                     One-time payment for consultation access
@@ -495,21 +681,23 @@ function DoctorProfileView({
         <CardContent>
           <div className="grid gap-2">
             {daysOfWeek.map((day, index) => {
-              const dayData = doctor.availability[day]
-              const isAvailable = dayData?.enabled && dayData.slots.length > 0
-              
+              const dayData = doctor.availability[day];
+              const isAvailable = dayData?.enabled && dayData.slots.length > 0;
+
               return (
-                <div 
-                  key={day} 
+                <div
+                  key={day}
                   className={cn(
                     "flex items-center justify-between rounded-lg p-3",
-                    isAvailable ? "bg-secondary/20" : "bg-muted/30"
+                    isAvailable ? "bg-secondary/20" : "bg-muted/30",
                   )}
                 >
-                  <span className={cn(
-                    "font-medium",
-                    !isAvailable && "text-muted-foreground"
-                  )}>
+                  <span
+                    className={cn(
+                      "font-medium",
+                      !isAvailable && "text-muted-foreground",
+                    )}
+                  >
                     {shortDays[index]}
                   </span>
                   <div className="text-right">
@@ -522,11 +710,13 @@ function DoctorProfileView({
                         ))}
                       </div>
                     ) : (
-                      <span className="text-sm text-muted-foreground">Unavailable</span>
+                      <span className="text-sm text-muted-foreground">
+                        Unavailable
+                      </span>
                     )}
                   </div>
                 </div>
-              )
+              );
             })}
           </div>
         </CardContent>
@@ -551,54 +741,64 @@ function DoctorProfileView({
                     </Avatar>
                     <div>
                       <p className="text-sm font-medium">{review.user}</p>
-                      <p className="text-xs text-muted-foreground">{review.date}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {review.date}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-0.5">
                     {[...Array(5)].map((_, i) => (
-                      <Star 
-                        key={i} 
+                      <Star
+                        key={i}
                         className={cn(
                           "h-3 w-3",
-                          i < review.rating 
-                            ? "fill-secondary-foreground text-secondary-foreground" 
-                            : "text-muted"
-                        )} 
+                          i < review.rating
+                            ? "fill-secondary-foreground text-secondary-foreground"
+                            : "text-muted",
+                        )}
                       />
                     ))}
                   </div>
                 </div>
-                <p className="mt-3 text-sm text-muted-foreground">{review.comment}</p>
+                <p className="mt-3 text-sm text-muted-foreground">
+                  {review.comment}
+                </p>
               </CardContent>
             </Card>
           ))}
         </div>
         {canLoadMoreReviews ? (
           <div className="flex justify-center">
-            <Button variant="outline" onClick={onLoadMoreReviews} disabled={isLoadingReviews}>
+            <Button
+              variant="outline"
+              onClick={onLoadMoreReviews}
+              disabled={isLoadingReviews}
+            >
               {isLoadingReviews ? "Loading..." : "Load More Reviews"}
             </Button>
           </div>
         ) : null}
         <p className="text-center text-sm text-muted-foreground">
-          {doctor.reviews.length > 0 ? "Showing real reviews from patients." : "No reviews yet for this doctor."}
+          {doctor.reviews.length > 0
+            ? "Showing real reviews from patients."
+            : "No reviews yet for this doctor."}
         </p>
       </div>
     </div>
-  )
+  );
 }
 
 // Payment Required Dialog
-function PaymentDialog({ 
-  doctor, 
-  open, 
-  onClose 
-}: { 
-  doctor: DoctorProfile | null
-  open: boolean
-  onClose: () => void
+function PaymentDialog({
+  doctor,
+  open,
+  onClose,
+}: {
+  doctor: DoctorProfile | null;
+  open: boolean;
+  onClose: () => void;
 }) {
-  if (!doctor) return null
+  if (!doctor) return null;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -612,21 +812,28 @@ function PaymentDialog({
             One-time payment to access chat with {doctor.name}
           </DialogDescription>
         </DialogHeader>
-        
+
         <div className="space-y-4 py-4">
           <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-3">
             <Avatar className="h-12 w-12">
               <AvatarImage src={doctor.avatar} />
               <AvatarFallback className="bg-secondary text-secondary-foreground">
-                {doctor.name.split(' ').map(n => n[0]).join('')}
+                {doctor.name
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1">
               <p className="font-medium">{doctor.name}</p>
-              <p className="text-sm text-muted-foreground">{doctor.specialty}</p>
+              <p className="text-sm text-muted-foreground">
+                {doctor.specialty}
+              </p>
             </div>
             <div className="text-right">
-              <p className="text-xl font-bold text-primary">{doctor.consultationFee} ETB</p>
+              <p className="text-xl font-bold text-primary">
+                {doctor.consultationFee} ETB
+              </p>
               <p className="text-xs text-muted-foreground">one-time</p>
             </div>
           </div>
@@ -636,19 +843,27 @@ function PaymentDialog({
             <ul className="space-y-2">
               <li className="flex items-start gap-2 text-sm">
                 <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-secondary-foreground" />
-                <span className="text-muted-foreground">Private chat with {doctor.name}</span>
+                <span className="text-muted-foreground">
+                  Private chat with {doctor.name}
+                </span>
               </li>
               <li className="flex items-start gap-2 text-sm">
                 <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-secondary-foreground" />
-                <span className="text-muted-foreground">Personalized health advice</span>
+                <span className="text-muted-foreground">
+                  Personalized health advice
+                </span>
               </li>
               <li className="flex items-start gap-2 text-sm">
                 <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-secondary-foreground" />
-                <span className="text-muted-foreground">Response within 24 hours</span>
+                <span className="text-muted-foreground">
+                  Response within 24 hours
+                </span>
               </li>
               <li className="flex items-start gap-2 text-sm">
                 <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-secondary-foreground" />
-                <span className="text-muted-foreground">Secure and confidential</span>
+                <span className="text-muted-foreground">
+                  Secure and confidential
+                </span>
               </li>
             </ul>
           </div>
@@ -660,7 +875,10 @@ function PaymentDialog({
         </div>
 
         <div className="flex flex-col gap-2">
-          <Link href={`/dashboard/payment?doctor=${doctor.id}&amount=${doctor.consultationFee}`} className="w-full">
+          <Link
+            href={`/dashboard/payment?doctor=${doctor.id}&amount=${doctor.consultationFee}`}
+            className="w-full"
+          >
             <Button className="w-full gap-2">
               <Sparkles className="h-4 w-4" />
               Pay {doctor.consultationFee} ETB
@@ -672,57 +890,53 @@ function PaymentDialog({
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
 
 // Chat Room View for paid users
-function ChatRoomView({ 
-  chatRoom, 
+function ChatRoomView({
+  chatRoom,
   onBack,
   onOpenRating,
   onClearHistory,
   onSendMessage,
   isSending,
-}: { 
-  chatRoom: ChatRoom
-  onBack: () => void
-  onOpenRating: () => void
-  onClearHistory: () => void
-  onSendMessage: (messageText: string) => Promise<void>
-  isSending: boolean
+}: {
+  chatRoom: ChatRoom;
+  onBack: () => void;
+  onOpenRating: () => void;
+  onClearHistory: () => void;
+  onSendMessage: (messageText: string) => Promise<void>;
+  isSending: boolean;
 }) {
-  const [message, setMessage] = useState("")
-  const [showClearDialog, setShowClearDialog] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [message, setMessage] = useState("");
+  const [showClearDialog, setShowClearDialog] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   useEffect(() => {
-    scrollToBottom()
-  }, [chatRoom.messages])
+    scrollToBottom();
+  }, [chatRoom.messages]);
 
   const handleSend = async () => {
-    if (message.trim()) {
-      await onSendMessage(message.trim())
-      setMessage("")
-    }
-    // Save to DB via chatApi
+    if (!message.trim()) return;
+
     try {
-      await chatApi.sendMessage(newMsg)
-    } catch (e) {
-      setSendError("Sorry, your message could not be sent. Please try again.")
-      return
+      await onSendMessage(message.trim());
+      setMessage("");
+    } catch {
+      // If message send fails, keep the typed content so the user can retry.
     }
-    setMessage("")
-  }
+  };
 
   const handleClearHistory = () => {
-    setMessages([])
-    onClearHistory()
-    setShowClearDialog(false)
-  }
+    setMessages([]);
+    onClearHistory();
+    setShowClearDialog(false);
+  };
 
   return (
     <div className="flex h-[calc(100vh-8rem)] flex-col">
@@ -734,21 +948,31 @@ function ChatRoomView({
         <Avatar className="h-10 w-10">
           <AvatarImage src={chatRoom.doctor.avatar} />
           <AvatarFallback className="bg-secondary text-secondary-foreground">
-            {chatRoom.doctor.name.split(' ').map(n => n[0]).join('')}
+            {chatRoom.doctor.name
+              .split(" ")
+              .map((n) => n[0])
+              .join("")}
           </AvatarFallback>
         </Avatar>
         <div className="flex-1">
           <h3 className="font-medium">{chatRoom.doctor.name}</h3>
-          <p className="text-xs text-muted-foreground">{chatRoom.doctor.specialty}</p>
+          <p className="text-xs text-muted-foreground">
+            {chatRoom.doctor.specialty}
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={onOpenRating} className="gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onOpenRating}
+            className="gap-1"
+          >
             <Star className="h-3 w-3" />
             Rate
           </Button>
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => setShowClearDialog(true)}
             className="text-destructive hover:text-destructive hover:bg-destructive/10"
           >
@@ -771,18 +995,30 @@ function ChatRoomView({
           </div>
         ) : (
           chatRoom.messages.map((msg) => (
-            <div key={msg.id} className={cn("flex", msg.sender === "user" ? "justify-end" : "justify-start")}>
-              <div className={cn(
-                "max-w-[80%] rounded-2xl px-4 py-2",
-                msg.sender === "user" 
-                  ? "bg-primary text-primary-foreground rounded-br-sm" 
-                  : "bg-muted rounded-bl-sm"
-              )}>
+            <div
+              key={msg.id}
+              className={cn(
+                "flex",
+                msg.sender === "user" ? "justify-end" : "justify-start",
+              )}
+            >
+              <div
+                className={cn(
+                  "max-w-[80%] rounded-2xl px-4 py-2",
+                  msg.sender === "user"
+                    ? "bg-primary text-primary-foreground rounded-br-sm"
+                    : "bg-muted rounded-bl-sm",
+                )}
+              >
                 <p className="text-sm">{msg.content}</p>
-                <p className={cn(
-                  "mt-1 text-[10px]",
-                  msg.sender === "user" ? "text-primary-foreground/70" : "text-muted-foreground"
-                )}>
+                <p
+                  className={cn(
+                    "mt-1 text-[10px]",
+                    msg.sender === "user"
+                      ? "text-primary-foreground/70"
+                      : "text-muted-foreground",
+                  )}
+                >
                   {msg.time}
                 </p>
               </div>
@@ -799,11 +1035,16 @@ function ChatRoomView({
             placeholder="Type your message..."
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && void handleSend()}
+            onKeyDown={(e) =>
+              e.key === "Enter" && !e.shiftKey && void handleSend()
+            }
             className="flex-1"
             disabled={isSending}
           />
-          <Button onClick={() => void handleSend()} disabled={!message.trim() || isSending}>
+          <Button
+            onClick={() => void handleSend()}
+            disabled={!message.trim() || isSending}
+          >
             <Send className="h-4 w-4" />
           </Button>
         </div>
@@ -818,12 +1059,13 @@ function ChatRoomView({
               Clear Chat History?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete all messages in this conversation. This action cannot be undone.
+              This will permanently delete all messages in this conversation.
+              This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={handleClearHistory}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
@@ -833,33 +1075,51 @@ function ChatRoomView({
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  )
+  );
 }
 
 // Main Consulting Page
 export default function ConsultingPage() {
-  const { user } = useAuth()
-  
-  const [view, setView] = useState<"list" | "profile" | "chat">("list")
-  const [selectedDoctor, setSelectedDoctor] = useState<DoctorProfile | null>(null)
-  const [selectedChatRoom, setSelectedChatRoom] = useState<ChatRoom | null>(null)
-  const [showPaymentDialog, setShowPaymentDialog] = useState(false)
-  const [showRatingDialog, setShowRatingDialog] = useState(false)
-  const [reviewPage, setReviewPage] = useState(1)
-  const [reviewTotalPages, setReviewTotalPages] = useState(1)
-  const [isLoadingReviews, setIsLoadingReviews] = useState(false)
-  const [isLoadingChats, setIsLoadingChats] = useState(false)
-  const [isSendingMessage, setIsSendingMessage] = useState(false)
-  
+  const { user } = useAuth();
+
+  const [view, setView] = useState<"list" | "profile" | "chat">("list");
+  const [selectedDoctor, setSelectedDoctor] = useState<DoctorProfile | null>(
+    null,
+  );
+  const [selectedChatRoom, setSelectedChatRoom] = useState<ChatRoom | null>(
+    null,
+  );
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [showRatingDialog, setShowRatingDialog] = useState(false);
+  const [reviewPage, setReviewPage] = useState(1);
+  const [reviewTotalPages, setReviewTotalPages] = useState(1);
+  const [isLoadingReviews, setIsLoadingReviews] = useState(false);
+  const [isLoadingChats, setIsLoadingChats] = useState(false);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [pageMessage, setPageMessage] = useState<PageMessage | null>(null);
+
+  const canLoadMoreReviews = Boolean(
+    selectedDoctor &&
+    (selectedDoctor.reviews?.length || 0) > 0 &&
+    reviewPage < reviewTotalPages,
+  );
+
+  const onLoadMoreReviews = async () => {
+    if (!selectedDoctor) return;
+    await refreshDoctorReviews(selectedDoctor, reviewPage + 1, true);
+  };
+
   // Server-backed access per doctor
-  const [paidDoctorIds, setPaidDoctorIds] = useState<number[]>([])
-  
-  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([])
+  const [paidDoctorIds, setPaidDoctorIds] = useState<number[]>([]);
+
+  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
+  const [doctorsList, setDoctorsList] = useState<DoctorProfile[]>([]);
+  const paymentHandledRef = useRef(false);
 
   useEffect(() => {
     if (!user?.id) {
-      setPaidDoctorIds([])
-      return
+      setPaidDoctorIds([]);
+      return;
     }
 
     const loadAccess = async () => {
@@ -869,343 +1129,393 @@ export default function ConsultingPage() {
             const response = await getConsultationAccess({
               userId: user.id,
               doctorId: String(doctor.id),
-            })
-            return response?.data?.hasAccess ? doctor.id : null
+            });
+            return response?.data?.hasAccess ? doctor.id : null;
           } catch {
-            return null
+            return null;
           }
-        })
-      )
-      setPaidDoctorIds(checks.filter((id): id is number => id !== null))
-    }
+        }),
+      );
+      setPaidDoctorIds(checks.filter((id): id is number => id !== null));
+    };
 
-    loadAccess()
-  }, [user?.id])
+    loadAccess();
+  }, [user?.id]);
 
   // Auto-handle payment success
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
+    const params = new URLSearchParams(window.location.search);
     if (params.get("payment") === "success") {
-      const doctorId = params.get("doctor")
+      const doctorId = params.get("doctor");
       if (doctorId && user?.id) {
-        const docId = parseInt(doctorId)
-        const doctor = doctors.find(d => d.id === docId)
-        ;(async () => {
-          if (!doctor) return
+        const docId = parseInt(doctorId);
+        const doctor = doctors.find((d) => d.id === docId);
+        (async () => {
+          if (!doctor) return;
           try {
             const response = await getConsultationAccess({
               userId: user.id,
               doctorId: String(docId),
-            })
-            const hasAccess = Boolean(response?.data?.hasAccess)
-            if (!hasAccess) return
+            });
+            const hasAccess = Boolean(response?.data?.hasAccess);
+            if (!hasAccess) return;
 
-            setPaidDoctorIds((prev) => (prev.includes(docId) ? prev : [...prev, docId]))
-            let roomToOpen: ChatRoom | null = null
+            setPaidDoctorIds((prev) =>
+              prev.includes(docId) ? prev : [...prev, docId],
+            );
+            let roomToOpen: ChatRoom | null = null;
             setChatRooms((prev) => {
-              const existingRoom = prev.find((r) => r.doctor.id === docId)
+              const existingRoom = prev.find((r) => r.doctor.id === docId);
               if (existingRoom) {
-                roomToOpen = existingRoom
-                return prev
+                roomToOpen = existingRoom;
+                return prev;
               }
               const newRoom: ChatRoom = {
                 id: `chat-${Date.now()}`,
                 doctor,
                 createdAt: "Just now",
                 messages: [],
-              }
-              roomToOpen = newRoom
-              return [newRoom, ...prev]
-            })
+              };
+              roomToOpen = newRoom;
+              return [newRoom, ...prev];
+            });
             if (roomToOpen) {
-              setSelectedChatRoom(roomToOpen)
-              setSelectedDoctor(doctor)
-              setView("chat")
+              setSelectedChatRoom(roomToOpen);
+              setSelectedDoctor(doctor);
+              setView("chat");
             }
           } catch {
             // no-op: keep user on consulting page if access check fails
           }
-        })()
+        })();
       }
       // Clear URL params
-      window.history.replaceState({}, '', '/dashboard/consulting')
+      window.history.replaceState({}, "", "/dashboard/consulting");
     }
-  }, [user?.id])
+  }, [user?.id]);
 
-  const hasPaidForDoctor = (doctorId: number) => paidDoctorIds.includes(doctorId)
-
-  const handleDoctorClick = (doctor: typeof doctors[0]) => {
-    setSelectedDoctor(doctor)
-    setView("profile")
-  }
-
-  const handleContactDoctor = () => {
-    if (!selectedDoctor) return
-    
-    if (hasPaidForDoctor(selectedDoctor.id)) {
-      // Check if chat room exists
-      const existingRoom = chatRooms.find(r => r.doctor.id === selectedDoctor.id)
-      if (existingRoom) {
-        setSelectedChatRoom(existingRoom)
-        setView("chat")
-      } else {
-        // Create new chat room
-        const newRoom: ChatRoom = {
-          id: `chat-${Date.now()}`,
-          doctor: selectedDoctor,
-          createdAt: "Just now",
-          messages: []
-        }
-        setChatRooms((prev) => [newRoom, ...prev])
-        setSelectedChatRoom(newRoom)
-        setView("chat")
-      }
-    } else {
-      setShowPaymentDialog(true)
-    }
+  const upsertLocalChatRoom = (doctor: DoctorProfile): ChatRoom => {
+    let room: ChatRoom | null = null;
 
     setChatRooms((prev) => {
-      const existing = prev.find((item) => item.id === room.id)
-      if (!existing) return [room, ...prev]
-      return prev.map((item) =>
-        item.id === room.id
-          ? {
-              ...item,
-              doctor,
-              createdAt: room.createdAt,
-            }
-          : item
-      )
-    })
+      const existingRoom = prev.find((r) => r.doctor.id === doctor.id);
+      if (existingRoom) {
+        room = existingRoom;
+        return prev;
+      }
 
-    return room
-  }
+      const newRoom: ChatRoom = {
+        id: `local-${Date.now()}`,
+        doctor,
+        createdAt: "Just now",
+        messages: [],
+      };
 
-  const refreshDoctorReviews = async (doctor: any, page = 1, append = false) => {
-    if (!doctor?.doctorRecordId) return
+      room = newRoom;
+      return [newRoom, ...prev];
+    });
 
-    setIsLoadingReviews(true)
+    return room as ChatRoom;
+  };
+
+  const refreshDoctorReviews = async (
+    doctor: any,
+    page = 1,
+    append = false,
+  ) => {
+    if (!doctor?.doctorRecordId) return;
+
+    setIsLoadingReviews(true);
     try {
       const [ratingsResponse, stats] = await Promise.all([
-        getDoctorRatings(doctor.doctorRecordId, { limit: REVIEWS_PAGE_SIZE, page }),
+        getDoctorRatings(doctor.doctorRecordId, {
+          limit: REVIEWS_PAGE_SIZE,
+          page,
+        }),
         getDoctorRatingStats(doctor.doctorRecordId),
-      ])
+      ]);
 
-      const incomingReviews = mapRatingsToReviews(ratingsResponse?.data || [], doctor.id)
+      const incomingReviews = mapRatingsToReviews(
+        ratingsResponse?.data || [],
+        doctor.id,
+      );
       const mergedReviews = append
         ? [
             ...(Array.isArray(doctor.reviews) ? doctor.reviews : []),
             ...incomingReviews.filter(
-              (review: any) => !(Array.isArray(doctor.reviews) ? doctor.reviews : []).some((existing: any) => existing.id === review.id)
+              (review: any) =>
+                !(Array.isArray(doctor.reviews) ? doctor.reviews : []).some(
+                  (existing: any) => existing.id === review.id,
+                ),
             ),
           ]
-        : incomingReviews
+        : incomingReviews;
 
       const updatedDoctor = {
         ...doctor,
         rating: Number(stats?.average || doctor.rating || 0),
         totalReviews: Number(stats?.total || doctor.totalReviews || 0),
         reviews: mergedReviews,
-      }
+      };
 
-      setReviewPage(Number(page))
-      setReviewTotalPages(Number(ratingsResponse?.pagination?.totalPages || 1))
-      setSelectedDoctor(updatedDoctor)
-      setDoctorsList((prev) => prev.map((item) => (item.id === updatedDoctor.id ? { ...item, rating: updatedDoctor.rating, totalReviews: updatedDoctor.totalReviews, reviews: updatedDoctor.reviews } : item)))
-      setChatRooms((prev) => prev.map((room) => (room.doctor.id === updatedDoctor.id ? { ...room, doctor: { ...room.doctor, rating: updatedDoctor.rating, totalReviews: updatedDoctor.totalReviews, reviews: updatedDoctor.reviews } } : room)))
+      setReviewPage(Number(page));
+      setReviewTotalPages(Number(ratingsResponse?.pagination?.totalPages || 1));
+      setSelectedDoctor(updatedDoctor);
+      setDoctorsList((prev) =>
+        prev.map((item) =>
+          item.id === updatedDoctor.id
+            ? {
+                ...item,
+                rating: updatedDoctor.rating,
+                totalReviews: updatedDoctor.totalReviews,
+                reviews: updatedDoctor.reviews,
+              }
+            : item,
+        ),
+      );
+      setChatRooms((prev) =>
+        prev.map((room) =>
+          room.doctor.id === updatedDoctor.id
+            ? {
+                ...room,
+                doctor: {
+                  ...room.doctor,
+                  rating: updatedDoctor.rating,
+                  totalReviews: updatedDoctor.totalReviews,
+                  reviews: updatedDoctor.reviews,
+                },
+              }
+            : room,
+        ),
+      );
     } finally {
-      setIsLoadingReviews(false)
+      setIsLoadingReviews(false);
     }
-  }
+  };
 
   useEffect(() => {
     const loadDoctorsAvailability = async () => {
       try {
-        const response = await getDoctors({ limit: 100 })
-        const backendDoctors = Array.isArray(response?.data) ? response.data : []
-        if (backendDoctors.length === 0) return
+        const response = await getDoctors({ limit: 100 });
+        const backendDoctors = Array.isArray(response?.data)
+          ? response.data
+          : [];
+        if (backendDoctors.length === 0) return;
 
-        const baseDoctors = mapBackendDoctorsToUi(backendDoctors)
+        const baseDoctors = mapBackendDoctorsToUi(backendDoctors);
         const uiDoctors = await Promise.all(
           baseDoctors.map(async (doctor) => {
-            if (!doctor.doctorRecordId) return doctor
+            if (!doctor.doctorRecordId) return doctor;
             try {
               const [ratingsResponse, stats] = await Promise.all([
-                getDoctorRatings(doctor.doctorRecordId, { limit: REVIEWS_PAGE_SIZE, page: 1 }),
+                getDoctorRatings(doctor.doctorRecordId, {
+                  limit: REVIEWS_PAGE_SIZE,
+                  page: 1,
+                }),
                 getDoctorRatingStats(doctor.doctorRecordId),
-              ])
+              ]);
 
-              const reviews = mapRatingsToReviews(ratingsResponse?.data, doctor.id)
+              const reviews = mapRatingsToReviews(
+                ratingsResponse?.data,
+                doctor.id,
+              );
 
               return {
                 ...doctor,
                 rating: Number(stats?.average || doctor.rating || 0),
-                totalReviews: Number(stats?.total || reviews.length || doctor.totalReviews || 0),
+                totalReviews: Number(
+                  stats?.total || reviews.length || doctor.totalReviews || 0,
+                ),
                 reviews,
-              }
+              };
             } catch {
-              return doctor
+              return doctor;
             }
-          })
-        )
+          }),
+        );
 
-        setDoctorsList(uiDoctors)
+        setDoctorsList(uiDoctors);
 
         // If selected doctor is open, keep it in sync with the refreshed data.
         setSelectedDoctor((prev) => {
-          if (!prev) return prev
-          const updated = uiDoctors.find((item) => item.id === prev.id)
-          return updated || prev
-        })
+          if (!prev) return prev;
+          const updated = uiDoctors.find((item) => item.id === prev.id);
+          return updated || prev;
+        });
       } catch {
-        setDoctorsList([])
+        setDoctorsList([]);
       }
-    }
+    };
 
-    void loadDoctorsAvailability()
-  }, [])
+    void loadDoctorsAvailability();
+  }, []);
 
   useEffect(() => {
     const loadUserConsultations = async () => {
-      if (!user?.id || doctorsList.length === 0) return
+      if (!user?.id || doctorsList.length === 0) return;
 
-      setIsLoadingChats(true)
+      setIsLoadingChats(true);
       try {
-        const chats = await getChats({ userId: user.id, sessionStatus: "Active" })
-        const items = Array.isArray(chats) ? chats : []
+        const chats = await getChats({
+          userId: user.id,
+          sessionStatus: "Active",
+        });
+        const items = Array.isArray(chats) ? chats : [];
 
         const mappedRooms = items
           .map((chat: any) => {
-            const doctorRecordId = String(chat?.doctorId?._id || "")
-            const doctor = doctorsList.find((item) => item.doctorRecordId === doctorRecordId)
-            if (!doctor) return null
+            const doctorRecordId = String(chat?.doctorId?._id || "");
+            const doctor = doctorsList.find(
+              (item) => item.doctorRecordId === doctorRecordId,
+            );
+            if (!doctor) return null;
 
             return {
               id: String(chat?._id || ""),
               doctor,
               createdAt: formatChatTime(chat?.createdAt || chat?.updatedAt),
               messages: [],
-            } as ChatRoom
+            } as ChatRoom;
           })
-          .filter(Boolean) as ChatRoom[]
+          .filter(Boolean) as ChatRoom[];
 
-        setChatRooms(mappedRooms)
-        setPaidDoctorIds([...new Set(mappedRooms.map((room) => room.doctor.id))])
+        setChatRooms(mappedRooms);
+        setPaidDoctorIds([
+          ...new Set(mappedRooms.map((room) => room.doctor.id)),
+        ]);
 
         setSelectedChatRoom((prev) => {
-          if (!prev) return prev
-          const updated = mappedRooms.find((room) => room.id === prev.id)
-          return updated || prev
-        })
+          if (!prev) return prev;
+          const updated = mappedRooms.find((room) => room.id === prev.id);
+          return updated || prev;
+        });
       } catch {
-        setChatRooms([])
-        setPaidDoctorIds([])
+        setChatRooms([]);
+        setPaidDoctorIds([]);
       } finally {
-        setIsLoadingChats(false)
+        setIsLoadingChats(false);
       }
-    }
+    };
 
-    void loadUserConsultations()
-  }, [user?.id, doctorsList])
+    void loadUserConsultations();
+  }, [user?.id, doctorsList]);
 
   useEffect(() => {
     const loadMessages = async () => {
-      if (!selectedChatRoom?.id) return
+      if (!selectedChatRoom?.id) return;
 
       // Frontend-only local chats do not fetch from backend.
-      if (selectedChatRoom.id.startsWith("local-")) return
+      if (selectedChatRoom.id.startsWith("local-")) return;
 
       try {
-        const response = await getMessagesByChat(selectedChatRoom.id, { limit: 200 })
-        const items = Array.isArray(response?.data) ? response.data : []
-        const mappedMessages = items.map(mapBackendMessageToUi)
+        const response = await getMessagesByChat(selectedChatRoom.id, {
+          limit: 200,
+        });
+        const items = Array.isArray(response?.data) ? response.data : [];
+        const mappedMessages = items.map(mapBackendMessageToUi);
 
         setChatRooms((prev) =>
-          prev.map((room) => (room.id === selectedChatRoom.id ? { ...room, messages: mappedMessages } : room))
-        )
+          prev.map((room) =>
+            room.id === selectedChatRoom.id
+              ? { ...room, messages: mappedMessages }
+              : room,
+          ),
+        );
         setSelectedChatRoom((prev) =>
-          prev && prev.id === selectedChatRoom.id ? { ...prev, messages: mappedMessages } : prev
-        )
+          prev && prev.id === selectedChatRoom.id
+            ? { ...prev, messages: mappedMessages }
+            : prev,
+        );
       } catch {
         setChatRooms((prev) =>
-          prev.map((room) => (room.id === selectedChatRoom.id ? { ...room, messages: [] } : room))
-        )
+          prev.map((room) =>
+            room.id === selectedChatRoom.id ? { ...room, messages: [] } : room,
+          ),
+        );
       }
-    }
+    };
 
-    void loadMessages()
-  }, [selectedChatRoom?.id])
+    void loadMessages();
+  }, [selectedChatRoom?.id]);
 
   // Auto-handle payment success
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    if (params.get("payment") !== "success" || paymentHandledRef.current) return
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment") !== "success" || paymentHandledRef.current)
+      return;
 
-    const doctorId = params.get("doctor")
-    const doctorRecordId = params.get("doctorRecordId")
+    const doctorId = params.get("doctor");
+    const doctorRecordId = params.get("doctorRecordId");
 
     const doctor = doctorRecordId
       ? doctorsList.find((item) => item.doctorRecordId === doctorRecordId)
       : doctorId
         ? doctorsList.find((item) => item.id === Number(doctorId))
-        : undefined
-    if (!doctor) return
+        : undefined;
+    if (!doctor) return;
 
-    const docId = Number(doctor.id)
+    const docId = Number(doctor.id);
 
-    paymentHandledRef.current = true
+    paymentHandledRef.current = true;
 
-    setPaidDoctorIds((prev) => (prev.includes(docId) ? prev : [...prev, docId]))
-    const room = upsertLocalChatRoom(doctor)
-    setSelectedDoctor(doctor)
-    setSelectedChatRoom(room)
-    setView("chat")
+    setPaidDoctorIds((prev) =>
+      prev.includes(docId) ? prev : [...prev, docId],
+    );
+    const room = upsertLocalChatRoom(doctor);
+    setSelectedDoctor(doctor);
+    setSelectedChatRoom(room);
+    setView("chat");
 
-    window.history.replaceState({}, "", "/dashboard/consulting")
-  }, [doctorsList])
+    window.history.replaceState({}, "", "/dashboard/consulting");
+  }, [doctorsList]);
 
-  const hasPaidForDoctor = (doctorId: number) => paidDoctorIds.includes(doctorId)
+  const hasPaidForDoctor = (doctorId: number) =>
+    paidDoctorIds.includes(doctorId);
 
   const handleDoctorClick = (doctor: DoctorProfile) => {
-    setSelectedDoctor(doctor)
-    setReviewPage(1)
-    setReviewTotalPages(1)
-    setView("profile")
-    void refreshDoctorReviews(doctor, 1, false)
-  }
+    setSelectedDoctor(doctor);
+    setReviewPage(1);
+    setReviewTotalPages(1);
+    setView("profile");
+    void refreshDoctorReviews(doctor, 1, false);
+  };
 
   const handleContactDoctor = async () => {
-    if (!selectedDoctor) return
+    if (!selectedDoctor) return;
 
     // Frontend-only mock M-Pesa flow: require local "paid" state before opening chat.
     if (!hasPaidForDoctor(Number(selectedDoctor.id))) {
-      setShowPaymentDialog(true)
-      return
+      setShowPaymentDialog(true);
+      return;
     }
 
-    const room = upsertLocalChatRoom(selectedDoctor)
-    setSelectedChatRoom(room)
-    setView("chat")
-  }
+    const room = upsertLocalChatRoom(selectedDoctor);
+    setSelectedChatRoom(room);
+    setView("chat");
+  };
 
   const handleOpenExistingChat = (chatRoom: ChatRoom) => {
-    setSelectedChatRoom(chatRoom)
-    setSelectedDoctor(chatRoom.doctor)
-    setView("chat")
-  }
+    setSelectedChatRoom(chatRoom);
+    setSelectedDoctor(chatRoom.doctor);
+    setView("chat");
+  };
 
   const handleBack = () => {
     if (view === "chat") {
-      setSelectedChatRoom(null)
-      setView("list")
+      setSelectedChatRoom(null);
+      setView("list");
     } else if (view === "profile") {
-      setSelectedDoctor(null)
-      setView("list")
+      setSelectedDoctor(null);
+      setView("list");
     }
-  }
+  };
 
-  const handleRatingSubmit = async (rating: number, comment: string, anonymous: boolean) => {
-    if (!selectedDoctor?.doctorRecordId || !user?.id) return
+  const handleRatingSubmit = async (
+    rating: number,
+    comment: string,
+    anonymous: boolean,
+  ) => {
+    if (!selectedDoctor?.doctorRecordId || !user?.id) return;
 
     try {
       await submitDoctorRating(selectedDoctor.doctorRecordId, {
@@ -1213,33 +1523,36 @@ export default function ConsultingPage() {
         rating,
         comment,
         anonymous,
-      })
+      });
 
-      await refreshDoctorReviews(selectedDoctor, 1, false)
+      await refreshDoctorReviews(selectedDoctor, 1, false);
     } catch {
-      setPageMessage({ type: "error", text: "Failed to submit rating. Please try again." })
+      setPageMessage({
+        type: "error",
+        text: "Failed to submit rating. Please try again.",
+      });
     }
-  }
+  };
 
   const handleLoadMoreReviews = () => {
-    if (!selectedDoctor) return
-    if (reviewPage >= reviewTotalPages) return
-    void refreshDoctorReviews(selectedDoctor, reviewPage + 1, true)
-  }
+    if (!selectedDoctor) return;
+    if (reviewPage >= reviewTotalPages) return;
+    void refreshDoctorReviews(selectedDoctor, reviewPage + 1, true);
+  };
 
   const handleClearHistory = () => {
     if (selectedChatRoom) {
-      setChatRooms(chatRooms.map(room => 
-        room.id === selectedChatRoom.id 
-          ? { ...room, messages: [] }
-          : room
-      ))
-      setSelectedChatRoom({ ...selectedChatRoom, messages: [] })
+      setChatRooms(
+        chatRooms.map((room) =>
+          room.id === selectedChatRoom.id ? { ...room, messages: [] } : room,
+        ),
+      );
+      setSelectedChatRoom({ ...selectedChatRoom, messages: [] });
     }
-  }
+  };
 
   const handleSendChatMessage = async (messageText: string) => {
-    if (!selectedChatRoom?.id || !user?.id) return
+    if (!selectedChatRoom?.id || !user?.id) return;
 
     if (selectedChatRoom.id.startsWith("local-")) {
       const uiMessage = {
@@ -1247,24 +1560,24 @@ export default function ConsultingPage() {
         sender: "user" as const,
         content: messageText,
         time: "Just now",
-      }
+      };
 
       setChatRooms((prev) =>
         prev.map((room) =>
           room.id === selectedChatRoom.id
             ? { ...room, messages: [...room.messages, uiMessage] }
-            : room
-        )
-      )
+            : room,
+        ),
+      );
       setSelectedChatRoom((prev) =>
         prev && prev.id === selectedChatRoom.id
           ? { ...prev, messages: [...prev.messages, uiMessage] }
-          : prev
-      )
-      return
+          : prev,
+      );
+      return;
     }
 
-    setIsSendingMessage(true)
+    setIsSendingMessage(true);
     try {
       const created = await sendMessage({
         chatId: selectedChatRoom.id,
@@ -1272,27 +1585,30 @@ export default function ConsultingPage() {
         senderRole: "User",
         messageType: "text",
         messageText,
-      })
+      });
 
-      const uiMessage = mapBackendMessageToUi(created)
+      const uiMessage = mapBackendMessageToUi(created);
       setChatRooms((prev) =>
         prev.map((room) =>
           room.id === selectedChatRoom.id
             ? { ...room, messages: [...room.messages, uiMessage] }
-            : room
-        )
-      )
+            : room,
+        ),
+      );
       setSelectedChatRoom((prev) =>
         prev && prev.id === selectedChatRoom.id
           ? { ...prev, messages: [...prev.messages, uiMessage] }
-          : prev
-      )
+          : prev,
+      );
     } catch {
-      setPageMessage({ type: "error", text: "Failed to send message. Please try again." })
+      setPageMessage({
+        type: "error",
+        text: "Failed to send message. Please try again.",
+      });
     } finally {
-      setIsSendingMessage(false)
+      setIsSendingMessage(false);
     }
-  }
+  };
 
   const messageBanner = pageMessage ? (
     <Alert
@@ -1310,14 +1626,14 @@ export default function ConsultingPage() {
       )}
       <AlertDescription>{pageMessage.text}</AlertDescription>
     </Alert>
-  ) : null
+  ) : null;
 
   // Chat Room View
   if (view === "chat" && selectedChatRoom) {
     return (
       <>
         {messageBanner}
-        <ChatRoomView 
+        <ChatRoomView
           chatRoom={selectedChatRoom}
           onBack={handleBack}
           onOpenRating={() => setShowRatingDialog(true)}
@@ -1332,7 +1648,7 @@ export default function ConsultingPage() {
           onSubmit={handleRatingSubmit}
         />
       </>
-    )
+    );
   }
 
   // Doctor Profile View
@@ -1340,19 +1656,22 @@ export default function ConsultingPage() {
     return (
       <>
         {messageBanner}
-        <DoctorProfileView 
+        <DoctorProfileView
           doctor={selectedDoctor}
           onBack={handleBack}
           onContact={handleContactDoctor}
           hasPaidAccess={hasPaidForDoctor(selectedDoctor.id)}
+          canLoadMoreReviews={canLoadMoreReviews}
+          onLoadMoreReviews={onLoadMoreReviews}
+          isLoadingReviews={isLoadingReviews}
         />
-        <PaymentDialog 
+        <PaymentDialog
           doctor={selectedDoctor}
           open={showPaymentDialog}
           onClose={() => setShowPaymentDialog(false)}
         />
       </>
-    )
+    );
   }
 
   // Doctors List View (default)
@@ -1383,7 +1702,7 @@ export default function ConsultingPage() {
           </div>
           <div className="grid gap-3">
             {chatRooms.map((room) => (
-              <Card 
+              <Card
                 key={room.id}
                 className="cursor-pointer transition-all hover:shadow-md hover:border-primary/30"
                 onClick={() => handleOpenExistingChat(room)}
@@ -1393,15 +1712,22 @@ export default function ConsultingPage() {
                     <Avatar className="h-12 w-12">
                       <AvatarImage src={room.doctor.avatar} />
                       <AvatarFallback className="bg-secondary text-secondary-foreground">
-                        {room.doctor.name.split(' ').map(n => n[0]).join('')}
+                        {room.doctor.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <h3 className="font-medium">{room.doctor.name}</h3>
-                        <span className="text-xs text-muted-foreground shrink-0">{room.createdAt}</span>
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          {room.createdAt}
+                        </span>
                       </div>
-                      <p className="text-sm text-muted-foreground">{room.doctor.specialty}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {room.doctor.specialty}
+                      </p>
                       {room.messages.length > 0 && (
                         <p className="mt-1 text-sm text-muted-foreground truncate">
                           {room.messages[room.messages.length - 1].content}
@@ -1418,7 +1744,9 @@ export default function ConsultingPage() {
       )}
 
       {isLoadingChats ? (
-        <p className="text-sm text-muted-foreground">Loading your consultations...</p>
+        <p className="text-sm text-muted-foreground">
+          Loading your consultations...
+        </p>
       ) : null}
 
       {/* All Doctors */}
@@ -1428,9 +1756,9 @@ export default function ConsultingPage() {
         </h2>
         <div className="grid gap-4 md:grid-cols-2">
           {doctors.map((doctor) => {
-            const hasPaid = hasPaidForDoctor(doctor.id)
+            const hasPaid = hasPaidForDoctor(doctor.id);
             return (
-              <Card 
+              <Card
                 key={doctor.id}
                 className="cursor-pointer transition-all hover:shadow-md"
                 onClick={() => handleDoctorClick(doctor)}
@@ -1440,14 +1768,20 @@ export default function ConsultingPage() {
                     <Avatar className="h-14 w-14">
                       <AvatarImage src={doctor.avatar} />
                       <AvatarFallback className="bg-secondary text-secondary-foreground">
-                        {doctor.name.split(' ').map(n => n[0]).join('')}
+                        {doctor.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
                         <h3 className="font-semibold">{doctor.name}</h3>
                         {hasPaid ? (
-                          <Badge variant="outline" className="gap-1 text-xs bg-secondary/20">
+                          <Badge
+                            variant="outline"
+                            className="gap-1 text-xs bg-secondary/20"
+                          >
                             <CheckCircle className="h-3 w-3" />
                             Paid
                           </Badge>
@@ -1458,31 +1792,42 @@ export default function ConsultingPage() {
                           </Badge>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground">{doctor.specialty}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {doctor.specialty}
+                      </p>
                       <div className="mt-2 flex items-center gap-3">
                         <div className="flex items-center gap-1">
                           <Star className="h-3 w-3 fill-secondary-foreground text-secondary-foreground" />
-                          <span className="text-sm font-medium">{doctor.rating}</span>
-                          <span className="text-xs text-muted-foreground">({doctor.totalReviews})</span>
+                          <span className="text-sm font-medium">
+                            {doctor.rating}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            ({doctor.totalReviews})
+                          </span>
                         </div>
-                        <Badge variant={doctor.available ? "default" : "secondary"} className="text-xs">
+                        <Badge
+                          variant={doctor.available ? "default" : "secondary"}
+                          className="text-xs"
+                        >
                           {doctor.available ? "Available" : "Unavailable"}
                         </Badge>
                       </div>
                       {doctor.available && (
                         <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
                           <Clock className="h-3 w-3" />
-                          <span>{getAvailabilitySummary(doctor.availability)}</span>
+                          <span>
+                            {getAvailabilitySummary(doctor.availability)}
+                          </span>
                         </div>
                       )}
                     </div>
                   </div>
                 </CardContent>
               </Card>
-            )
+            );
           })}
         </div>
       </div>
     </div>
-  )
+  );
 }

@@ -1,8 +1,9 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import Image from "next/image"
-import { usePathname, useRouter } from "next/navigation"
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Home,
   Users,
@@ -17,7 +18,7 @@ import {
   Flag,
   LogOut,
   Crown,
-} from "lucide-react"
+} from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -30,9 +31,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarSeparator,
-} from "@/components/ui/sidebar"
-import { useAuth } from "@/lib/auth-context"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+} from "@/components/ui/sidebar";
+import { useAuth } from "@/lib/auth-context";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const womanNavItems = [
   { title: "Home", icon: Home, href: "/dashboard" },
@@ -40,58 +41,72 @@ const womanNavItems = [
   { title: "My Posts", icon: FileText, href: "/dashboard/my-posts" },
   { title: "Knowledge Hub", icon: BookOpen, href: "/dashboard/knowledge" },
   { title: "Consulting", icon: MessageCircle, href: "/dashboard/consulting" },
-]
+];
 
 const doctorNavItems = [
   { title: "Info", icon: FileText, href: "/doctor" },
   { title: "Voice Notes", icon: Mic, href: "/doctor/voice-notes" },
   { title: "Premium Chat Queue", icon: Inbox, href: "/doctor/chats" },
-]
+];
 
 const adminNavItems = [
   { title: "Doctor Management", icon: UserCog, href: "/admin" },
   { title: "Moderation Queue", icon: Flag, href: "/admin/moderation" },
-]
+];
 
 export function AppSidebar() {
-  const pathname = usePathname()
-  const router = useRouter()
-  const { user, logout } = useAuth()
-  const [mounted, setMounted] = useState(false)
+  const pathname = usePathname();
+  const router = useRouter();
+  const { user, logout } = useAuth();
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true)
-  }, [])
+    setMounted(true);
+  }, []);
 
   const handleLogout = () => {
-    logout()
-    router.push("/login")
-  }
+    logout();
+    router.push("/login");
+  };
 
   const getNavItems = () => {
     switch (user?.role) {
       case "doctor":
-        return doctorNavItems
+        return doctorNavItems;
       case "admin":
-        return adminNavItems
+        return adminNavItems;
       default:
-        return womanNavItems
+        return womanNavItems;
     }
-  }
+  };
 
-  const navItems = getNavItems()
-  const roleLabel = user?.role === "doctor" ? "Doctor Portal" : user?.role === "admin" ? "Admin Portal" : "My Wellness"
+  const navItems = getNavItems();
+  const roleLabel =
+    user?.role === "doctor"
+      ? "Doctor Portal"
+      : user?.role === "admin"
+        ? "Admin Portal"
+        : "My Wellness";
 
   return (
     <Sidebar>
       <SidebarHeader className="p-4">
-        <Link href={user?.role === "doctor" ? "/doctor" : user?.role === "admin" ? "/admin" : "/dashboard"} className="flex items-center">
+        <Link
+          href={
+            user?.role === "doctor"
+              ? "/doctor"
+              : user?.role === "admin"
+                ? "/admin"
+                : "/dashboard"
+          }
+          className="flex items-center"
+        >
           <div className="h-12 w-12 overflow-hidden rounded-full border-2 border-sidebar-accent">
-            <Image 
-              src="/logo.jpg" 
-              alt="EFOY" 
-              width={48} 
-              height={48} 
+            <Image
+              src="/logo.jpg"
+              alt="EFOY"
+              width={48}
+              height={48}
               className="h-full w-full object-cover"
             />
           </div>
@@ -102,15 +117,14 @@ export function AppSidebar() {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/50">{roleLabel}</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-sidebar-foreground/50">
+            {roleLabel}
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={pathname === item.href}
-                  >
+                  <SidebarMenuButton asChild isActive={pathname === item.href}>
                     <Link href={item.href}>
                       <item.icon className="size-4" />
                       <span>{item.title}</span>
@@ -156,5 +170,5 @@ export function AppSidebar() {
         )}
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }
